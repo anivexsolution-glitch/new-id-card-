@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Print Specific Rules for CR80 ID Cards and A4 Multi-card Sheets */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm;
+  }
+
+  html,
+  body,
+  #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-app-shell,
+  .print-main,
+  .print-view-root,
+  .print-sheets-container {
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .print-sheet-frame {
+    display: block !important;
+    margin: 0 auto !important;
+    padding: 2mm 0 0 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    max-width: none !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-sheet-frame:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-sheet {
+    width: var(--print-sheet-width, 176mm) !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  .print-card-box {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Custom scrollbars for dense administrative tables */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

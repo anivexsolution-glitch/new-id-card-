@@ -1,11 +1,20 @@
-<div align="center">
+# ScholarCard Pro
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+This project includes 30 school ID card templates in CR80 proportions: 15 portrait and 15 landscape. Each design has a matching reverse side.
 
-  <h1>Built with AI Studio</h2>
+## View the designs
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+Extract the ZIP and open `Templates-Preview.html` in your browser. Select Portrait or Landscape to filter the collection. Select Show reverse sides to see the back designs.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Run the generator
 
-</div>
+Use Node.js 22.12 or later. Open a terminal in this folder and run:
+
+```sh
+npm ci
+npm run dev
+```
+
+Open the local address shown in the terminal. On the sign-in screen, use **Fill Demo Login**, then **Sign In to Dashboard**. Open **ID Card Designs** to choose a template.
+
+To create a production build, run `npm run build`. The included `dist` folder contains the compiled application and can be served from the root of a static web server.

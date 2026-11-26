@@ -1,0 +1,6 @@
+{
+  "name": "ScholarCard Pro — School ID Generator",
+  "description": "Professional school administration system for high-precision bulk student ID card generation, Excel roster import, CR80 print-ready layout engine, and PDF/PNG export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

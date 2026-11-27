@@ -28,6 +28,11 @@
           "description": "Optional avatar URL.",
           "maxLength": 1024
         },
+        "phoneNumber": {
+          "type": "string",
+          "description": "Optional verified E.164 mobile phone number.",
+          "maxLength": 32
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",
@@ -82,6 +87,10 @@
           "maxLength": 254
         },
         "academicSession": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "defaultCardValidUntil": {
           "type": "string",
           "maxLength": 40
         },
@@ -242,6 +251,29 @@
           "type": "string",
           "maxLength": 32
         },
+        "cardStatus": {
+          "type": "string",
+          "enum": ["active", "lost", "expired", "suspended"],
+          "maxLength": 16
+        },
+        "validUntil": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "statusReason": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "statusUpdatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "verificationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
         "clientCreatedAt": {
           "type": "string",
           "maxLength": 64
@@ -400,6 +432,158 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "PublicVerificationDoc": {
+      "title": "PublicVerificationDoc",
+      "description": "Publicly readable non-PII live verification snapshot for QR code scanning showing real-time card validity and lost-card status.",
+      "type": "object",
+      "properties": {
+        "verifyId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "idCardNumber": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "fatherName": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "motherName": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "dob": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "classGrade": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "rollNo": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "conveyance": {
+          "type": "string",
+          "enum": ["Yes", "No"],
+          "maxLength": 8
+        },
+        "session": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "cardStatus": {
+          "type": "string",
+          "enum": ["active", "lost", "expired", "suspended"],
+          "maxLength": 16
+        },
+        "validUntil": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "statusReason": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "statusUpdatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "schoolName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "schoolCode": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "schoolAddress": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "schoolContact": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "schoolEmail": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "schoolLogoUrl": {
+          "type": "string",
+          "maxLength": 260000
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 260000
+        },
+        "maskedContact": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "maskedAddress": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "verifyId",
+        "ownerId",
+        "studentId",
+        "idCardNumber",
+        "name",
+        "fatherName",
+        "classGrade",
+        "rollNo",
+        "conveyance",
+        "session",
+        "cardStatus",
+        "validUntil",
+        "statusReason",
+        "statusUpdatedAt",
+        "schoolName",
+        "schoolCode",
+        "schoolAddress",
+        "schoolContact",
+        "schoolEmail",
+        "schoolLogoUrl",
+        "photoUrl",
+        "maskedContact",
+        "maskedAddress",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -432,6 +616,12 @@
         "$ref": "#/entities/ExportHistoryDoc"
       },
       "description": "Private export history records owned by the user."
+    },
+    "/publicVerifications/{verifyId}": {
+      "schema": {
+        "$ref": "#/entities/PublicVerificationDoc"
+      },
+      "description": "Publicly gettable (non-listable) live card verification record used by QR code scans."
     }
   }
 }

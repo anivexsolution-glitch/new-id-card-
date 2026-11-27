@@ -21,17 +21,30 @@ function hasRestrictedStylesheet(): boolean {
   return false;
 }
 
+const TRANSPARENT_PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+export function formatExportError(err: unknown, fallback = 'Could not render export image.'): string {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  if (typeof err === 'string' && err.trim()) {
+    return err;
+  }
+  return fallback;
+}
+
 export const renderElementToDataUrl = async (
   element: HTMLElement,
   pixelRatio: number = 3,
   backgroundColor: string | null = '#ffffff'
 ): Promise<string> => {
   const skipFonts = hasRestrictedStylesheet();
-  const options = {
-    pixelRatio,
-    cacheBust: true,
+  const baseOptions = {
+    cacheBust: false,
     backgroundColor: backgroundColor || undefined,
-    skipFonts,
+    imagePlaceholder: TRANSPARENT_PIXEL,
+    onImageErrorHandler: (() => undefined) as unknown as OnErrorEventHandler,
     filter: (node: Node) => {
       if (node instanceof HTMLElement && node.classList.contains('no-print')) {
         return false;
@@ -41,10 +54,27 @@ export const renderElementToDataUrl = async (
   };
 
   try {
-    return await toPng(element, options);
-  } catch (err) {
-    console.warn('Standard toPng failed, retrying with skipFonts: true fallback', err);
-    return await toPng(element, { ...options, skipFonts: true });
+    return await toPng(element, { ...baseOptions, pixelRatio, skipFonts });
+  } catch (err1) {
+    console.warn('Primary toPng render failed, retrying with skipFonts fallback:', formatExportError(err1));
+    try {
+      return await toPng(element, {
+        ...baseOptions,
+        pixelRatio: Math.min(pixelRatio, 2),
+        skipFonts: true,
+      });
+    } catch (err2) {
+      console.warn('Secondary toPng render failed, retrying at 1x scale:', formatExportError(err2));
+      try {
+        return await toPng(element, {
+          ...baseOptions,
+          pixelRatio: 1,
+          skipFonts: true,
+        });
+      } catch (err3) {
+        throw new Error(formatExportError(err3, 'Failed to render ID card image for export.'));
+      }
+    }
   }
 };
 

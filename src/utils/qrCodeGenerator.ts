@@ -20,7 +20,7 @@ export function createStudentVerificationToken(student: Student, schoolSettings:
     db: student.dob,
     ad: student.address,
     cv: student.conveyance,
-    ss: student.session,
+    ss: schoolSettings.academicSession || student.session,
     cg: student.classGrade || '',
     rn: student.rollNo || '',
     bg: student.bloodGroup || '',
@@ -124,4 +124,28 @@ export async function generateStudentQRDataUrl(url: string): Promise<string> {
     console.error('Error generating QR code', err);
     return '';
   }
+}
+
+export function isValidityDateExpired(validUntil?: string): boolean {
+  const raw = (validUntil || '').trim();
+  if (!raw) return false;
+
+  // Match YYYY-MM-DD
+  const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    const expiry = new Date(Number(y), Number(m) - 1, Number(d), 23, 59, 59, 999);
+    return !Number.isNaN(expiry.getTime()) && expiry.getTime() < Date.now();
+  }
+
+  // Match DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = raw.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    const expiry = new Date(Number(y), Number(m) - 1, Number(d), 23, 59, 59, 999);
+    return !Number.isNaN(expiry.getTime()) && expiry.getTime() < Date.now();
+  }
+
+  const parsed = new Date(raw);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() < Date.now();
 }

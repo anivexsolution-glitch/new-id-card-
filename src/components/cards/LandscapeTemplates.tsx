@@ -119,7 +119,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={14} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill="#ffffff" maxLines={1} />
       {sessionVisible && (
         <TextBlock
-          text={`SESSION ${student.session || schoolSettings.academicSession}  •  STUDENT IDENTITY CARD`}
+          text={`SESSION ${schoolSettings.academicSession || student.session}  •  STUDENT IDENTITY CARD`}
           x={logoVisible ? 28 + customLogoSize + 16 : 30}
           y={54}
           width={620}
@@ -167,7 +167,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
         <rect x="24" y={sidePhotoY + customPhotoH + 16} width="166" height="30" rx="4" fill={accent} />
         <TextBlock text="STUDENT CARD" x={24} y={sidePhotoY + customPhotoH + 22} width={166} fontSize={13.5} weight={800} letterSpacing={1.2} anchor="middle" fill="#0f172a" />
         {sessionVisible && (
-          <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={24} y={sidePhotoY + customPhotoH + 56} width={166} fontSize={13.5} weight={700} anchor="middle" fill="#e2e8f0" />
+          <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={24} y={sidePhotoY + customPhotoH + 56} width={166} fontSize={13.5} weight={700} anchor="middle" fill="#e2e8f0" />
         )}
 
       <TextBlock text={schoolSettings.schoolName} x={238} y={14} width={592} fontSize={schoolNameSize} weight={800} role="heading" fill={ink} maxLines={1} />
@@ -195,7 +195,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={12} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={14} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill="#ffffff" maxLines={1} />
       {sessionVisible && (
-        <TextBlock text={`ACADEMIC SESSION: ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill={accent} />
+        <TextBlock text={`ACADEMIC SESSION: ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill={accent} />
       )}
 
       <Photo student={student} x={32} y={136} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 6} borderColor={accent} />
@@ -221,7 +221,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={10} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={14} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill="#ffffff" maxLines={1} />
       {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#fef08a" />
+        <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#fef08a" />
       )}
 
       <rect x={32 - 4} y={128 - 4} width={customPhotoW + 8} height={customPhotoH + 8} rx="8" fill="none" stroke={ink} strokeWidth="3" />
@@ -321,7 +321,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
         {logoVisible && <Logo schoolSettings={schoolSettings} x={32} y={24} size={headerLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
         <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={28} width={logoVisible ? 770 - (headerLogoSize + 16) : 770} fontSize={schoolNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill="#ffffff" maxLines={1} />
         {sessionVisible && (
-          <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={68} width={500} fontSize={14} letterSpacing={1.2} weight={800} fill={accent} />
+          <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={68} width={500} fontSize={14} letterSpacing={1.2} weight={800} fill={accent} />
         )}
 
         <Photo student={student} x={34} y={128} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
@@ -358,7 +358,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={18} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={ink} />}
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={20} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill={ink} maxLines={1} />
       {sessionVisible && (
-        <TextBlock text={`SESSION: ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={60} width={500} fontSize={14} weight={800} fill="#334155" />
+        <TextBlock text={`SESSION: ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={60} width={500} fontSize={14} weight={800} fill="#334155" />
       )}
 
       <Photo student={student} x={32} y={116} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 6} borderColor={ink} />
@@ -382,7 +382,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={12} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={14} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill="#ffffff" maxLines={1} />
       {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#fef08a" />
+        <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#fef08a" />
       )}
 
       <Photo student={student} x={32} y={134} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 8} borderColor={accent} />
@@ -438,7 +438,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={12} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={14} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill="#ffffff" maxLines={1} />
       {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#fee2e2" />
+        <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#fee2e2" />
       )}
 
       <Photo student={student} x={32} y={134} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 8} borderColor={ink} />
@@ -467,7 +467,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
         {logoVisible && <Logo schoolSettings={schoolSettings} x={32} y={24} size={headerLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
         <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={28} width={logoVisible ? 770 - (headerLogoSize + 16) : 770} fontSize={schoolNameSize} weight={800} role="heading" family="Cinzel, Georgia, serif" fill={ink} maxLines={1} />
         {sessionVisible && (
-          <TextBlock text={`ACADEMIC SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={68} width={560} fontSize={14} letterSpacing={1.1} weight={800} fill={accent} />
+          <TextBlock text={`ACADEMIC SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={68} width={560} fontSize={14} letterSpacing={1.1} weight={800} fill={accent} />
         )}
 
         <Photo student={student} x={34} y={photoY} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
@@ -504,7 +504,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={12} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={14} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill="#ffffff" maxLines={1} />
       {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#bae6fd" />
+        <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill="#bae6fd" />
       )}
 
       <Photo student={student} x={32} y={134} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 10} borderColor={accent} />
@@ -532,7 +532,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
         {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={11} size={headerLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
         <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + headerLogoSize + 16 : 30} y={16} width={logoVisible ? 792 - (headerLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" family="Cinzel, Georgia, serif" fill="#ffffff" maxLines={1} />
         {sessionVisible && (
-          <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + headerLogoSize + 16 : 30} y={56} width={560} fontSize={14} weight={800} fill={accent} />
+          <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + headerLogoSize + 16 : 30} y={56} width={560} fontSize={14} weight={800} fill={accent} />
         )}
 
         <Photo student={student} x={32} y={128} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
@@ -557,7 +557,7 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={12} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
       <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={14} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" fill="#ffffff" maxLines={1} />
       {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill={accent} />
+        <TextBlock text={`SESSION ${schoolSettings.academicSession || student.session}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={54} width={560} fontSize={14} weight={800} fill={accent} />
       )}
 
       <Photo student={student} x={32} y={134} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 8} borderColor={accent} />

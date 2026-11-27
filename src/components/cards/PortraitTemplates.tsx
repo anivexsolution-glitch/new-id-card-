@@ -178,7 +178,7 @@ export const RenderPortraitTemplate: React.FC<PortraitTemplateProps> = (props) =
         />
         {sessionVisible && (
           <TextBlock
-            text={`SESSION ${student.session || schoolSettings.academicSession}`}
+            text={`SESSION ${schoolSettings.academicSession || student.session}`}
             x={x}
             y={y + titleHeight + 4}
             width={w}
@@ -542,7 +542,7 @@ export const RenderPortraitTemplate: React.FC<PortraitTemplateProps> = (props) =
         />
         {sessionVisible && (
           <TextBlock
-            text={`STUDENT IDENTITY • SESSION ${student.session || schoolSettings.academicSession}`}
+            text={`STUDENT IDENTITY • SESSION ${schoolSettings.academicSession || student.session}`}
             x={38}
             y={sessionY}
             width={464}

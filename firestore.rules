@@ -12,7 +12,14 @@ service cloud.firestore {
     }
 
     function isVerifiedUser() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+      return isSignedIn() && (
+        request.auth.token.email_verified == true ||
+        (
+          request.auth.token.firebase.sign_in_provider == 'phone' &&
+          request.auth.token.phone_number is string &&
+          request.auth.token.phone_number.size() >= 7
+        )
+      );
     }
 
     function isVerifiedOwner(userId) {
@@ -43,7 +50,7 @@ service cloud.firestore {
     // Validation blueprint: UserProfile
     function isValidUserProfile(data, userId) {
       return data.keys().hasAll(['uid', 'email', 'displayName', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'phoneNumber', 'createdAt', 'updatedAt'])
         && data.uid is string
         && data.uid == request.auth.uid
         && data.uid == userId
@@ -53,6 +60,7 @@ service cloud.firestore {
         && data.displayName is string
         && data.displayName.size() <= 120
         && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1024))
+        && (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 32))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -68,7 +76,7 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'ownerId', 'schoolName', 'tagline', 'schoolCode', 'address',
-          'contactNumber', 'email', 'website', 'academicSession',
+          'contactNumber', 'email', 'website', 'academicSession', 'defaultCardValidUntil',
           'logoUrl', 'principalSignatureUrl', 'principalName',
           'defaultTemplateId', 'defaultOrientation', 'defaultCustomization',
           'cardDimensions', 'customBrandColors', 'visibleFields',
@@ -86,6 +94,7 @@ service cloud.firestore {
         && data.email is string && data.email.size() <= 254
         && data.website is string && data.website.size() <= 254
         && data.academicSession is string && data.academicSession.size() <= 40
+        && (!('defaultCardValidUntil' in data) || (data.defaultCardValidUntil is string && data.defaultCardValidUntil.size() <= 40))
         && data.logoUrl is string && data.logoUrl.size() <= 260000
         && data.principalSignatureUrl is string && data.principalSignatureUrl.size() <= 260000
         && data.principalName is string && data.principalName.size() <= 120
@@ -125,8 +134,9 @@ service cloud.firestore {
           'contactNumber', 'dob', 'address', 'conveyance',
           'session', 'rollNo', 'classGrade', 'bloodGroup',
           'photoUrl', 'photoCrop', 'idCardNumber', 'emergencyContact',
-          'isCardGenerated', 'generatedDate', 'clientCreatedAt',
-          'createdAt', 'updatedAt'
+          'isCardGenerated', 'generatedDate',
+          'cardStatus', 'validUntil', 'statusReason', 'statusUpdatedAt', 'verificationId',
+          'clientCreatedAt', 'createdAt', 'updatedAt'
         ])
         && data.id is string && isValidId(data.id) && data.id == studentId
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId == userId
@@ -154,6 +164,11 @@ service cloud.firestore {
         && (!('emergencyContact' in data) || (data.emergencyContact is string && data.emergencyContact.size() <= 40))
         && (!('isCardGenerated' in data) || data.isCardGenerated is bool)
         && (!('generatedDate' in data) || (data.generatedDate is string && data.generatedDate.size() <= 32))
+        && (!('cardStatus' in data) || data.cardStatus in ['active', 'lost', 'expired', 'suspended'])
+        && (!('validUntil' in data) || (data.validUntil is string && data.validUntil.size() <= 40))
+        && (!('statusReason' in data) || (data.statusReason is string && data.statusReason.size() <= 200))
+        && (!('statusUpdatedAt' in data) || (data.statusUpdatedAt is string && data.statusUpdatedAt.size() <= 64))
+        && (!('verificationId' in data) || (data.verificationId is string && isValidId(data.verificationId) && data.verificationId.size() <= 64))
         && data.clientCreatedAt is string && data.clientCreatedAt.size() <= 64
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -207,6 +222,53 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    // Validation blueprint: PublicVerificationDoc
+    function isValidPublicVerification(data, verifyId) {
+      return data.keys().hasAll([
+          'verifyId', 'ownerId', 'studentId', 'idCardNumber', 'name',
+          'fatherName', 'classGrade', 'rollNo', 'conveyance', 'session',
+          'cardStatus', 'validUntil', 'statusReason', 'statusUpdatedAt',
+          'schoolName', 'schoolCode', 'schoolAddress', 'schoolContact',
+          'schoolEmail', 'schoolLogoUrl', 'photoUrl', 'maskedContact',
+          'maskedAddress', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'verifyId', 'ownerId', 'studentId', 'idCardNumber', 'name',
+          'fatherName', 'motherName', 'dob', 'classGrade', 'rollNo',
+          'conveyance', 'session', 'cardStatus', 'validUntil',
+          'statusReason', 'statusUpdatedAt', 'schoolName', 'schoolCode',
+          'schoolAddress', 'schoolContact', 'schoolEmail', 'schoolLogoUrl',
+          'photoUrl', 'maskedContact', 'maskedAddress', 'createdAt', 'updatedAt'
+        ])
+        && data.verifyId is string && isValidId(data.verifyId) && data.verifyId == verifyId && data.verifyId.size() <= 64
+        && data.ownerId is string && data.ownerId == request.auth.uid && isValidId(data.ownerId)
+        && data.studentId is string && isValidId(data.studentId)
+        && data.idCardNumber is string && data.idCardNumber.size() <= 64
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 140
+        && data.fatherName is string && data.fatherName.size() <= 140
+        && (!('motherName' in data) || (data.motherName is string && data.motherName.size() <= 140))
+        && (!('dob' in data) || (data.dob is string && data.dob.size() <= 32))
+        && data.classGrade is string && data.classGrade.size() <= 60
+        && data.rollNo is string && data.rollNo.size() <= 40
+        && data.conveyance in ['Yes', 'No']
+        && data.session is string && data.session.size() <= 40
+        && data.cardStatus in ['active', 'lost', 'expired', 'suspended']
+        && data.validUntil is string && data.validUntil.size() <= 40
+        && data.statusReason is string && data.statusReason.size() <= 200
+        && data.statusUpdatedAt is string && data.statusUpdatedAt.size() <= 64
+        && data.schoolName is string && data.schoolName.size() >= 1 && data.schoolName.size() <= 180
+        && data.schoolCode is string && data.schoolCode.size() <= 80
+        && data.schoolAddress is string && data.schoolAddress.size() <= 320
+        && data.schoolContact is string && data.schoolContact.size() <= 80
+        && data.schoolEmail is string && data.schoolEmail.size() <= 254
+        && data.schoolLogoUrl is string && data.schoolLogoUrl.size() <= 260000
+        && data.photoUrl is string && data.photoUrl.size() <= 260000
+        && data.maskedContact is string && data.maskedContact.size() <= 40
+        && data.maskedAddress is string && data.maskedAddress.size() <= 320
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     // User root profile & private workspace
     match /users/{userId} {
       allow get: if isVerifiedOwner(userId) && isValidId(userId) && (resource == null || resource.data.uid == request.auth.uid);
@@ -222,7 +284,7 @@ service cloud.firestore {
         && incoming().uid == existing().uid
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'phoneNumber', 'updatedAt']);
       allow delete: if false;
 
       match /settings/{settingId} {
@@ -249,7 +311,7 @@ service cloud.firestore {
           && hasParentUser(userId)
           && incoming().diff(existing()).affectedKeys().hasOnly([
             'schoolName', 'tagline', 'schoolCode', 'address', 'contactNumber',
-            'email', 'website', 'academicSession', 'logoUrl',
+            'email', 'website', 'academicSession', 'defaultCardValidUntil', 'logoUrl',
             'principalSignatureUrl', 'principalName', 'defaultTemplateId',
             'defaultOrientation', 'defaultCustomization', 'cardDimensions',
             'customBrandColors', 'visibleFields', 'isDemoMode', 'updatedAt'
@@ -282,23 +344,27 @@ service cloud.firestore {
           && incoming().updatedAt == request.time
           && hasParentUser(userId)
           && (
-            // Action 1: Profile / photo edit
+            // Action 1: Profile / photo / validity edit
             incoming().diff(existing()).affectedKeys().hasOnly([
               'name', 'fatherName', 'motherName', 'contactNumber', 'dob',
               'address', 'conveyance', 'session', 'rollNo', 'classGrade',
               'bloodGroup', 'photoUrl', 'photoCrop', 'idCardNumber',
-              'emergencyContact', 'updatedAt'
+              'emergencyContact', 'cardStatus', 'validUntil', 'statusReason',
+              'statusUpdatedAt', 'verificationId', 'updatedAt'
             ]) ||
-            // Action 2: Card generation status toggle
+            // Action 2: Card generation or lifecycle status toggle
             incoming().diff(existing()).affectedKeys().hasOnly([
-              'isCardGenerated', 'generatedDate', 'updatedAt'
+              'isCardGenerated', 'generatedDate', 'cardStatus', 'validUntil',
+              'statusReason', 'statusUpdatedAt', 'verificationId', 'updatedAt'
             ]) ||
-            // Action 3: Full record update
+            // Action 3: Full record / rollover update
             incoming().diff(existing()).affectedKeys().hasOnly([
               'name', 'fatherName', 'motherName', 'contactNumber', 'dob',
               'address', 'conveyance', 'session', 'rollNo', 'classGrade',
               'bloodGroup', 'photoUrl', 'photoCrop', 'idCardNumber',
-              'emergencyContact', 'isCardGenerated', 'generatedDate', 'updatedAt'
+              'emergencyContact', 'isCardGenerated', 'generatedDate',
+              'cardStatus', 'validUntil', 'statusReason', 'statusUpdatedAt',
+              'verificationId', 'updatedAt'
             ])
           );
         allow delete: if isVerifiedOwner(userId)
@@ -354,6 +420,38 @@ service cloud.firestore {
           && existing().ownerId == request.auth.uid
           && hasParentUser(userId);
       }
+    }
+
+    // Publicly gettable (non-listable) live card verification snapshot for QR scans
+    match /publicVerifications/{verifyId} {
+      allow get: if isValidId(verifyId);
+      allow list: if false;
+      allow create: if isVerifiedOwner(incoming().ownerId)
+        && isValidId(verifyId)
+        && isValidPublicVerification(incoming(), verifyId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && hasParentUser(incoming().ownerId);
+      allow update: if isVerifiedOwner(existing().ownerId)
+        && isValidId(verifyId)
+        && isValidPublicVerification(incoming(), verifyId)
+        && incoming().verifyId == existing().verifyId
+        && incoming().ownerId == existing().ownerId
+        && incoming().studentId == existing().studentId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && hasParentUser(existing().ownerId)
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'idCardNumber', 'name', 'fatherName', 'motherName', 'dob',
+          'classGrade', 'rollNo', 'conveyance', 'session', 'cardStatus',
+          'validUntil', 'statusReason', 'statusUpdatedAt', 'schoolName',
+          'schoolCode', 'schoolAddress', 'schoolContact', 'schoolEmail',
+          'schoolLogoUrl', 'photoUrl', 'maskedContact', 'maskedAddress',
+          'updatedAt'
+        ]);
+      allow delete: if isVerifiedOwner(existing().ownerId)
+        && isValidId(verifyId)
+        && hasParentUser(existing().ownerId);
     }
   }
 }

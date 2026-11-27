@@ -9,7 +9,7 @@ import {
 } from '../../types';
 import { TEMPLATE_REGISTRY, getPairedTemplateId } from '../../constants/initialData';
 import { CR80Card } from '../cards/CR80Card';
-import { exportMultiCardA4Pdf } from '../../utils/export';
+import { exportMultiCardA4Pdf, formatExportError } from '../../utils/export';
 import { CardSurface, EmptyState, PageHeader, StatusText } from '../ui/EnterpriseUI';
 import {
   Printer,
@@ -51,13 +51,14 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
   const [activeClassFilter, setActiveClassFilter] = useState<string>('all');
   const [selectedPrintSource, setSelectedPrintSource] = useState<string>('school_default');
   const [printerPreset, setPrinterPreset] = useState<PrinterPreset>(
-    defaultOrientation === 'portrait' ? 'a4_6_portrait' : 'a4_8_landscape'
+    defaultOrientation === 'portrait' ? 'a4_9_portrait' : 'a4_8_landscape'
   );
   const [printSide, setPrintSide] = useState<'front' | 'back' | 'both'>('front');
   const [showCropMarks, setShowCropMarks] = useState<boolean>(true);
   const [cardGapMm, setCardGapMm] = useState<number>(4);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string>('');
+  const [exportErrorMsg, setExportErrorMsg] = useState<string>('');
 
   const printSheetsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -89,11 +90,11 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
   useEffect(() => {
     if (activeDesignOrientation === 'portrait') {
       setPrinterPreset((prev) =>
-        prev === 'a4_8_landscape' || prev === 'a4_10_compact' ? 'a4_6_portrait' : prev
+        prev === 'a4_8_landscape' || prev === 'a4_10_compact' ? 'a4_9_portrait' : prev
       );
     } else {
       setPrinterPreset((prev) =>
-        prev === 'a4_6_portrait' || prev === 'pvc_tray_5' ? 'a4_8_landscape' : prev
+        prev === 'a4_9_portrait' || prev === 'pvc_tray_5' ? 'a4_8_landscape' : prev
       );
     }
   }, [activeDesignOrientation, schoolSettings.defaultTemplateId, selectedPrintSource]);
@@ -129,14 +130,14 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
           sheetWidthClass: 'max-w-[840px]',
           description: 'Standard A4 sheet layout (4 rows × 2 columns).',
         };
-      case 'a4_6_portrait':
+      case 'a4_9_portrait':
         return {
-          name: 'A4 Sheet (6 Cards Portrait)',
+          name: 'A4 Sheet (9 Cards Portrait)',
           orientation: 'portrait' as const,
-          cardsPerPage: 6,
+          cardsPerPage: 9,
           gridClass: 'grid-cols-3',
           sheetWidthClass: 'max-w-[840px]',
-          description: 'Standard A4 sheet layout for portrait cards (2 rows × 3 columns).',
+          description: 'Full A4 sheet layout for portrait cards (3 rows × 3 columns).',
         };
       case 'a4_10_compact':
         return {
@@ -194,7 +195,12 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
     chunkedPages.push(selectedStudents.slice(i, i + CARDS_PER_PAGE));
   }
 
-  const effectiveGapMm = printerPreset === 'a4_10_compact' ? Math.min(cardGapMm, 2) : cardGapMm;
+  const effectiveGapMm =
+    printerPreset === 'a4_10_compact'
+      ? Math.min(cardGapMm, 2)
+      : printerPreset === 'a4_9_portrait'
+      ? Math.min(cardGapMm, 8)
+      : cardGapMm;
 
   const physicalSheetWidthMm = useMemo(() => {
     const portraitCardW = 53.98;
@@ -203,7 +209,7 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
       case 'a4_8_landscape':
       case 'a4_10_compact':
         return 2 * landscapeCardW + effectiveGapMm;
-      case 'a4_6_portrait':
+      case 'a4_9_portrait':
         return 3 * portraitCardW + 2 * effectiveGapMm;
       case 'pvc_tray_5':
         return 5 * portraitCardW + 4 * effectiveGapMm;
@@ -241,6 +247,7 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
     if (!printSheetsContainerRef.current) return;
     setIsExporting(true);
     setExportSuccessMsg('');
+    setExportErrorMsg('');
     const fileName = `IDCards_${printerPreset}_${Date.now()}.pdf`;
     try {
       await exportMultiCardA4Pdf(printSheetsContainerRef.current, fileName);
@@ -255,7 +262,9 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
       setExportSuccessMsg('Production A4 PDF exported successfully.');
       setTimeout(() => setExportSuccessMsg(''), 5000);
     } catch (e) {
-      console.error(e);
+      const msg = formatExportError(e, 'Could not generate A4 PDF. Please try Print Current View.');
+      console.warn('A4 PDF export failed:', msg);
+      setExportErrorMsg(msg);
     } finally {
       setIsExporting(false);
     }
@@ -303,6 +312,13 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
         <div className="no-print p-3.5 rounded-lg bg-[#25845A]/10 border border-[#25845A]/30 flex items-center gap-2 text-xs text-[#25845A]">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span className="font-semibold">{exportSuccessMsg}</span>
+        </div>
+      )}
+
+      {exportErrorMsg && (
+        <div className="no-print p-3.5 rounded-lg bg-[#C44949]/10 border border-[#C44949]/30 flex items-center gap-2 text-xs text-[#C44949]">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="font-semibold">{exportErrorMsg}</span>
         </div>
       )}
 
@@ -363,7 +379,7 @@ export const PrintExportView: React.FC<PrintExportViewProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {[
               { id: 'a4_8_landscape', label: 'A4 (8-in-1)', desc: 'Landscape 4×2' },
-              { id: 'a4_6_portrait', label: 'A4 (6-in-1)', desc: 'Portrait 3×2' },
+              { id: 'a4_9_portrait', label: 'A4 (9-in-1)', desc: 'Portrait 3×3' },
               { id: 'a4_10_compact', label: 'A4 (10-in-1)', desc: 'Compact 5×2' },
               { id: 'pvc_tray_5', label: '5-Card PVC Tray', desc: 'Epson / Canon' },
               { id: 'pvc_tray_2', label: '2-Card Dual Tray', desc: 'Epson R260/T50' },

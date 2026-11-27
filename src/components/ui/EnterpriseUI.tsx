@@ -1,5 +1,15 @@
 import React from 'react';
-import { X, ShieldAlert, FileSpreadsheet, Printer, QrCode, Layers } from 'lucide-react';
+import {
+  X,
+  FileSpreadsheet,
+  Printer,
+  QrCode,
+  Layers,
+  Building2,
+  Globe,
+  Mail,
+  ShieldCheck,
+} from 'lucide-react';
 
 interface PageHeaderProps {
   title: string;
@@ -114,10 +124,10 @@ export const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onCl
         <div className="px-6 py-4 border-b border-[#E3E7EB] flex items-center justify-between bg-[#F5F6F7]">
           <div>
             <h2 id="help-modal-title" className="text-base font-bold text-[#202B38]">
-              THE ID MAKER · Quick Reference & Support
+              THE ID MAKER · Quick Reference &amp; Support
             </h2>
             <p className="text-xs text-[#75808C] mt-0.5">
-              CR80 Production Standards, Bulk Import & Local Security Architecture
+              CR80 Production Standards, Bulk Import &amp; Cloud Workspace Support
             </p>
           </div>
           <button
@@ -173,18 +183,51 @@ export const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onCl
             </div>
           </div>
 
-          <div className="p-3.5 rounded-lg border border-[#E3E7EB] bg-[#F0F2F4] flex items-start gap-2.5">
-            <ShieldAlert className="w-4 h-4 text-[#C18A38] shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-lg border border-[#E3E7EB] bg-[#F5F6F7] flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-[#25845A] shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <p className="font-semibold text-[#202B38]">Local Browser Storage & Security Notice</p>
+              <p className="font-semibold text-[#202B38]">Private Cloud Storage &amp; Multi-Device Sync</p>
               <p className="text-[#75808C] leading-relaxed">
-                Student records, templates, and login session flags are stored locally in your browser (IndexedDB and localStorage). Client-side credentials protect single-station access only; integrate server-side authentication and role-based API authorization before multi-user network deployment.
+                Your school settings, students, custom templates, and export history are stored in your private Firebase Firestore workspace, isolated to your verified account and synced across devices.
               </p>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-[#E3E7EB] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <Building2 className="w-4 h-4 text-[#A77C50] shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-[#202B38]">Developed by Anivex Solution</p>
+                <p className="text-[#75808C] mt-0.5">
+                  Official Product Engineering &amp; Enterprise Support
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+              <a
+                href="https://anivexsolution.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[#24364B] hover:underline"
+              >
+                <Globe className="w-3.5 h-3.5 text-[#75808C]" />
+                <span>anivexsolution.in</span>
+              </a>
+              <a
+                href="mailto:info@anivexsolution.in"
+                className="inline-flex items-center gap-1.5 text-[#24364B] hover:underline"
+              >
+                <Mail className="w-3.5 h-3.5 text-[#75808C]" />
+                <span>info@anivexsolution.in</span>
+              </a>
             </div>
           </div>
         </div>
 
-        <div className="px-6 py-3.5 border-t border-[#E3E7EB] bg-[#F5F6F7] flex justify-end">
+        <div className="px-6 py-3.5 border-t border-[#E3E7EB] bg-[#F5F6F7] flex items-center justify-between gap-3">
+          <span className="text-[11px] text-[#75808C]">
+            © {new Date().getFullYear()} Anivex Solution · anivexsolution.in
+          </span>
           <button
             type="button"
             onClick={onClose}

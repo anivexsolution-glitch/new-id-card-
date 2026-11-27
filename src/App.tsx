@@ -17,6 +17,7 @@ import {
 } from './types';
 import { DEFAULT_SCHOOL_SETTINGS, DEMO_STUDENTS } from './constants/initialData';
 import { clearLegacyLocalCaches } from './utils/idbStorage';
+import { hasValidStudentPhoto } from './utils/photoUtils';
 import {
   appendExportHistoryCloud,
   bulkMarkGeneratedCloud,
@@ -25,8 +26,10 @@ import {
   deleteStudentCloud,
   deleteStudentsBatchCloud,
   ensureUserWorkspace,
+  promoteStudentsRolloverCloud,
   saveCustomTemplateCloud,
   saveUserSettingsCloud,
+  StudentRolloverPatch,
   subscribeUserWorkspace,
   syncStudentsBulkCloud,
   toggleStudentCardStatusCloud,
@@ -38,6 +41,11 @@ import { TopBar } from './components/layout/TopBar';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { StudentsView } from './components/students/StudentsView';
 import { StudentModal } from './components/students/StudentModal';
+import {
+  PromotionRolloverModal,
+  RolloverApplyPayload,
+  suggestPromotedClass,
+} from './components/students/PromotionRolloverModal';
 import { ExcelImportWizard } from './components/import/ExcelImportWizard';
 import { TemplateGalleryView } from './components/templates/TemplateGalleryView';
 import { CardEditorView } from './components/editor/CardEditorView';
@@ -79,6 +87,18 @@ export default function App() {
   // Modal states
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
+  const [isPromotionModalOpen, setIsPromotionModalOpen] = useState<boolean>(false);
+  const [studentsFilterRequest, setStudentsFilterRequest] = useState<{
+    value: 'all' | 'generated' | 'pending' | 'missing_photo';
+    nonce: number;
+  } | null>(null);
+
+  const navigateToStudentsWithFilter = (
+    filter: 'all' | 'generated' | 'pending' | 'missing_photo'
+  ) => {
+    setStudentsFilterRequest({ value: filter, nonce: Date.now() });
+    setActiveTab('students');
+  };
 
   const [toastState, setToastState] = useState<{
     message: string;
@@ -107,6 +127,7 @@ export default function App() {
       email: firebaseUser.email,
       displayName: firebaseUser.displayName,
       photoURL: firebaseUser.photoURL,
+      phoneNumber: firebaseUser.phoneNumber,
       emailVerified: firebaseUser.emailVerified,
     };
     setPendingVerificationUser(null);
@@ -192,13 +213,19 @@ export default function App() {
 
       if (!active) return;
 
-      if (!firebaseUser.emailVerified) {
+      const isPhoneVerified = Boolean(
+        firebaseUser.phoneNumber &&
+          firebaseUser.providerData?.some((p) => p.providerId === 'phone')
+      );
+
+      if (!firebaseUser.emailVerified && !isPhoneVerified) {
         setAuthUser(null);
         setPendingVerificationUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
+          phoneNumber: firebaseUser.phoneNumber,
           emailVerified: false,
         });
         setAuthReady(true);
@@ -503,10 +530,84 @@ export default function App() {
     ])
       .then(() =>
         triggerToast(
-          `Synced portraits for ${updatedStudents.filter((s) => s.photoUrl).length} students.`
+          `Synced portraits for ${updatedStudents.filter((s) => hasValidStudentPhoto(s.photoUrl)).length} students.`
         )
       )
       .catch((err) => handleCloudError('syncing bulk portraits', err));
+  };
+
+  const handlePromotionRollover = async (payload: RolloverApplyPayload) => {
+    const uid = authUser?.uid;
+    if (!uid) return;
+
+    const updates: StudentRolloverPatch[] = [];
+    const removeIds: string[] = [];
+    const nextStudents: Student[] = [];
+
+    for (const student of students) {
+      const sourceKey = (student.classGrade || '').trim();
+      const mapping = payload.classMappings[sourceKey];
+      const suggestion = suggestPromotedClass(sourceKey);
+
+      if (!mapping || !mapping.include) {
+        nextStudents.push(student);
+        continue;
+      }
+
+      if (suggestion.isGraduating && payload.graduatingPolicy === 'remove') {
+        removeIds.push(student.id);
+        continue;
+      }
+
+      const targetClass = mapping.targetClass.trim();
+      const nextClassGrade =
+        suggestion.isGraduating && payload.graduatingPolicy === 'keep'
+          ? student.classGrade
+          : targetClass || student.classGrade;
+
+      const nextGenerated = payload.resetCardStatus ? false : Boolean(student.isCardGenerated);
+      const nextGeneratedDate = payload.resetCardStatus ? '' : student.generatedDate || '';
+
+      updates.push({
+        id: student.id,
+        classGrade: nextClassGrade,
+        session: payload.nextSession,
+        isCardGenerated: nextGenerated,
+        generatedDate: nextGeneratedDate,
+      });
+
+      nextStudents.push({
+        ...student,
+        classGrade: nextClassGrade,
+        session: payload.nextSession,
+        isCardGenerated: nextGenerated,
+        generatedDate: nextGeneratedDate || undefined,
+      });
+    }
+
+    const nextSettings: SchoolSettings | null = payload.updateSettingsSession
+      ? {
+          ...schoolSettings,
+          academicSession: payload.nextSession,
+        }
+      : null;
+
+    setStudents(nextStudents);
+    if (nextSettings) {
+      setSchoolSettings(nextSettings);
+    }
+
+    try {
+      await promoteStudentsRolloverCloud(uid, updates, removeIds, nextSettings, isDemoMode);
+      triggerToast(
+        `Promoted ${updates.length} student${updates.length === 1 ? '' : 's'} to session ${payload.nextSession}${
+          removeIds.length > 0 ? ` (${removeIds.length} graduated removed)` : ''
+        }.`
+      );
+    } catch (err) {
+      handleCloudError('applying class promotion rollover', err);
+      throw err;
+    }
   };
 
   if (!authReady || syncingWorkspace) {
@@ -555,6 +656,7 @@ export default function App() {
         <TopBar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
+          onNavigateToStudents={navigateToStudentsWithFilter}
           onOpenAddModal={() => {
             setStudentToEdit(null);
             setIsStudentModalOpen(true);
@@ -592,6 +694,7 @@ export default function App() {
               exportHistory={exportHistory}
               isDemoMode={isDemoMode}
               onNavigate={setActiveTab}
+              onNavigateToStudents={navigateToStudentsWithFilter}
               onSelectStudentForEditor={(studentId) => {
                 setSelectedStudentForEditor(studentId);
                 setActiveTab('editor');
@@ -630,6 +733,8 @@ export default function App() {
               onUpdateStudentPhoto={handleUpdateStudentPhoto}
               onUpdateStudentsBulk={handleUpdateStudentsBulk}
               onLogExport={handleLogExport}
+              onOpenPromotionModal={() => setIsPromotionModalOpen(true)}
+              initialStatusFilter={studentsFilterRequest}
             />
           )}
 
@@ -709,6 +814,7 @@ export default function App() {
               onRestoreData={handleRestoreData}
               onResetToDemo={handleResetToDemo}
               onLogout={handleLogout}
+              onOpenPromotionModal={() => setIsPromotionModalOpen(true)}
             />
           )}
         </main>
@@ -723,6 +829,14 @@ export default function App() {
         onSave={handleSaveStudent}
         studentToEdit={studentToEdit}
         schoolSettings={schoolSettings}
+      />
+
+      <PromotionRolloverModal
+        isOpen={isPromotionModalOpen}
+        onClose={() => setIsPromotionModalOpen(false)}
+        students={students}
+        schoolSettings={schoolSettings}
+        onApplyRollover={handlePromotionRollover}
       />
 
       <HelpSupportModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />

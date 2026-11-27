@@ -236,6 +236,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <LogOut className="w-4 h-4" />
           </button>
         </div>
+
+        {!collapsed && (
+          <div className="px-2 pt-1 flex items-center justify-between text-[10px] text-[#75808C]">
+            <span className="truncate font-medium">Anivex Solution</span>
+            <a
+              href="https://anivexsolution.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#24364B] hover:underline shrink-0"
+            >
+              anivexsolution.in
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -17,7 +17,8 @@ import {
 } from '../../constants/initialData';
 import { CR80Card } from '../cards/CR80Card';
 import { buildStudentQrPayload } from '../cards/CardDesignSystem';
-import { exportElementAsPng, exportSingleCardPdf } from '../../utils/export';
+import { exportElementAsPng, exportSingleCardPdf, formatExportError } from '../../utils/export';
+import { isValidityDateExpired } from '../../utils/qrCodeGenerator';
 import { StatusText } from '../ui/EnterpriseUI';
 import {
   ArrowLeft,
@@ -54,6 +55,9 @@ import {
   CheckSquare,
   Square,
   Shield,
+  ShieldAlert,
+  ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 
 interface CardEditorViewProps {
@@ -69,7 +73,14 @@ interface CardEditorViewProps {
   onDeleteCustomTemplate?: (templateId: string) => void;
   onBackToProjects?: () => void;
   onNavigate?: (tab: ActiveNavTab) => void;
+  onOpenLiveVerification?: (student: Student) => void;
   onLogExport?: (entry: Omit<ExportHistoryRecord, 'id' | 'timestamp'>) => void;
+  onOpenSmartGenerator?: () => void;
+  smartCustomizationSeed?: {
+    nonce: number;
+    title?: string;
+    customization: CardCustomization;
+  } | null;
 }
 
 type LeftToolKey =
@@ -118,7 +129,10 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
   onDeleteCustomTemplate,
   onBackToProjects,
   onNavigate,
+  onOpenLiveVerification,
   onLogExport,
+  onOpenSmartGenerator,
+  smartCustomizationSeed,
 }) => {
   const [currentStudentId, setCurrentStudentId] = useState<string>(
     selectedStudentId || students[0]?.id || ''
@@ -300,6 +314,21 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
   }, [initialTemplateId]);
 
   useEffect(() => {
+    if (!smartCustomizationSeed) return;
+    if (smartCustomizationSeed.title) {
+      setProjectName(smartCustomizationSeed.title);
+    }
+    commitCustomization((prev) => ({
+      ...prev,
+      ...smartCustomizationSeed.customization,
+    }));
+    setStudioNotice('Loaded Smart Template suggestion');
+    const timer = setTimeout(() => setStudioNotice(''), 3200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smartCustomizationSeed?.nonce]);
+
+  useEffect(() => {
     if (rawActiveStudent) {
       setStudentForm(rawActiveStudent);
       setPhotoCrop(rawActiveStudent.photoCrop || { zoom: 1, x: 0, y: 0 });
@@ -374,6 +403,7 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
         schoolAddress: enabled,
         schoolContact: enabled,
         barcode: enabled,
+        validUntil: enabled,
       },
     }));
   };
@@ -497,7 +527,9 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
       });
       notifyStudio('PNG exported');
     } catch (e) {
-      console.error(e);
+      const msg = formatExportError(e, 'Could not export PNG');
+      console.warn('PNG export failed:', msg);
+      notifyStudio(msg);
     } finally {
       setIsExporting(false);
     }
@@ -523,7 +555,9 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
       });
       notifyStudio('CR80 PDF exported');
     } catch (e) {
-      console.error(e);
+      const msg = formatExportError(e, 'Could not export PDF');
+      console.warn('PDF export failed:', msg);
+      notifyStudio(msg);
     } finally {
       setIsExporting(false);
     }
@@ -639,6 +673,26 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
       case 'templates':
         return (
           <div className="space-y-4">
+            {onOpenSmartGenerator && (
+              <button
+                type="button"
+                onClick={onOpenSmartGenerator}
+                className="w-full p-2.5 rounded-lg border border-[#E3E7EB] bg-[#F5F6F7] hover:bg-[#F0F2F4] text-left flex items-center justify-between gap-2 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="w-4 h-4 text-[#A77C50] shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-xs font-semibold text-[#202B38] block truncate">
+                      Smart Match from Logo
+                    </span>
+                    <span className="text-[10px] text-[#75808C] block truncate">
+                      Generate layouts from school crest
+                    </span>
+                  </div>
+                </div>
+              </button>
+            )}
+
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-bold text-[#202B38] uppercase tracking-wider">
@@ -1015,6 +1069,13 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
                   className="w-full text-xs px-2 py-1.5 rounded border border-[#E3E7EB] bg-white font-mono"
                 />
               </div>
+              <input
+                type="text"
+                value={studentForm.validUntil || ''}
+                onChange={(e) => setStudentForm({ ...studentForm, validUntil: e.target.value })}
+                placeholder={`Valid Until (${schoolSettings.defaultCardValidUntil || '31/03/2026'})`}
+                className="w-full text-xs px-2.5 py-1.5 rounded border border-[#E3E7EB] bg-white font-mono"
+              />
               <button
                 type="button"
                 onClick={handleSaveStudentChanges}
@@ -1055,6 +1116,7 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
                 { key: 'contactNumber', defaultLabel: 'Contact No.' },
                 { key: 'conveyance', defaultLabel: 'Conveyance' },
                 { key: 'address', defaultLabel: 'Address' },
+                { key: 'validUntil', defaultLabel: 'Valid Until' },
               ].map(({ key, defaultLabel }) => {
                 const isVisible =
                   customization.fieldVisibility?.[key as keyof SchoolSettings['visibleFields']] !==
@@ -1380,11 +1442,23 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
             </div>
 
             {(customization.showBarcode ?? true) && (
-              <div className="p-3 rounded-lg bg-[#202B38] text-white font-mono text-[10px] leading-relaxed whitespace-pre-wrap">
-                <div className="text-[#A77C50] font-bold uppercase tracking-wider mb-1">
-                  Decoded QR Payload · {activeStudent.name}
+              <div className="space-y-2.5">
+                <div className="p-3 rounded-lg bg-[#202B38] text-white font-mono text-[10px] leading-relaxed break-all whitespace-pre-wrap">
+                  <div className="text-[#A77C50] font-bold uppercase tracking-wider mb-1">
+                    Live QR Verification URL · {activeStudent.name}
+                  </div>
+                  {buildStudentQrPayload(activeStudent, schoolSettings)}
                 </div>
-                {buildStudentQrPayload(activeStudent, schoolSettings)}
+                {onOpenLiveVerification && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenLiveVerification(activeStudent)}
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Live Verification Page</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1992,9 +2066,19 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
                 className="w-4 h-4 accent-[#24364B]"
               />
             </div>
-            <div className="p-2.5 rounded-lg bg-[#202B38] text-white font-mono text-[10px] leading-relaxed whitespace-pre-wrap">
+            <div className="p-2.5 rounded-lg bg-[#202B38] text-white font-mono text-[10px] leading-relaxed break-all whitespace-pre-wrap">
               {buildStudentQrPayload(activeStudent, schoolSettings)}
             </div>
+            {onOpenLiveVerification && (
+              <button
+                type="button"
+                onClick={() => onOpenLiveVerification(activeStudent)}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Live Verification</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -2486,6 +2570,46 @@ export const CardEditorView: React.FC<CardEditorViewProps> = ({
               </button>
             </div>
           </div>
+
+          {(() => {
+            const rawStatus = activeStudent.cardStatus || 'active';
+            const isDateExpired =
+              rawStatus === 'active' &&
+              isValidityDateExpired(activeStudent.validUntil || schoolSettings.defaultCardValidUntil);
+            const effStatus = isDateExpired ? 'expired' : rawStatus;
+            if (effStatus === 'active') return null;
+            return (
+              <div
+                className={`px-4 py-2 border-b text-xs flex items-center justify-between gap-3 ${
+                  effStatus === 'lost'
+                    ? 'bg-rose-50 border-rose-200 text-rose-900'
+                    : effStatus === 'expired'
+                    ? 'bg-amber-50 border-amber-200 text-amber-900'
+                    : 'bg-slate-200 border-slate-300 text-slate-900'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span className="font-semibold truncate">
+                    {effStatus === 'lost'
+                      ? 'Warning: This card is marked LOST — live QR scans show DO NOT HONOR.'
+                      : effStatus === 'expired'
+                      ? 'Notice: Card validity has expired — QR verification shows EXPIRED.'
+                      : 'Notice: Card is currently SUSPENDED on live verification.'}
+                  </span>
+                </div>
+                {onOpenLiveVerification && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenLiveVerification(activeStudent)}
+                    className="text-[11px] font-bold underline shrink-0"
+                  >
+                    Preview Live Status
+                  </button>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Canvas Viewport */}
           <div

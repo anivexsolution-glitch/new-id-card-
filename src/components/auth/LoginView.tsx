@@ -13,11 +13,13 @@ import { AuthenticatedUser, SchoolSettings } from '../../types';
 import {
   AlertCircle,
   ArrowRight,
+  Building2,
   CheckCircle2,
   Cloud,
   CreditCard,
   Eye,
   EyeOff,
+  Globe,
   Loader2,
   Lock,
   LogOut,
@@ -584,6 +586,34 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* Developer / Company Details */}
+        <div className="mt-4 bg-white rounded-[10px] border border-[#E3E7EB] px-4 py-3 text-[11px] text-[#536477]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-semibold text-[#202B38]">
+              <Building2 className="w-3.5 h-3.5 text-[#A77C50] shrink-0" />
+              <span>Developed by Anivex Solution</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 w-[161.156px]">
+              <a
+                href="https://anivexsolution.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[#24364B] hover:underline font-medium"
+              >
+                <Globe className="w-3 h-3 text-[#75808C]" />
+                <span>anivexsolution.in</span>
+              </a>
+              <a
+                href="mailto:info@anivexsolution.in"
+                className="inline-flex items-center gap-1 text-[#24364B] hover:underline font-medium"
+              >
+                <Mail className="w-3 h-3 text-[#75808C]" />
+                <span>info@anivexsolution.in</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

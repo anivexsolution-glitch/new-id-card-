@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { Student } from '../../types';
+import { hasValidStudentPhoto } from '../../utils/photoUtils';
 import { StatusText } from '../ui/EnterpriseUI';
 import {
   X,
@@ -154,7 +155,7 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
             idCardNumber: matchedStudent.idCardNumber,
             matchedFilename: filename,
             photoDataUrl: dataUrl,
-            isExistingReplaced: !!matchedStudent.photoUrl,
+            isExistingReplaced: hasValidStudentPhoto(matchedStudent.photoUrl),
           });
         } else {
           unmatched.push(filename);

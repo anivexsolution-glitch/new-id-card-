@@ -42,6 +42,7 @@ export const StudentQRCode: React.FC<StudentQRCodeProps> = ({
       schoolSettings.schoolCode,
       schoolSettings.address,
       schoolSettings.contactNumber,
+      schoolSettings.academicSession,
     ]
   );
 

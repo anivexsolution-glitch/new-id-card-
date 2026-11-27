@@ -19,6 +19,10 @@ import {
   Cloud,
   LogOut,
   ShieldCheck,
+  Building2,
+  Globe,
+  Mail,
+  GraduationCap,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -29,6 +33,7 @@ interface SettingsViewProps {
   onRestoreData: (restoredSettings: SchoolSettings, restoredStudents: Student[]) => void;
   onResetToDemo: () => void;
   onLogout?: () => void;
+  onOpenPromotionModal?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -39,6 +44,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onRestoreData,
   onResetToDemo,
   onLogout,
+  onOpenPromotionModal,
 }) => {
   const [formData, setFormData] = useState<SchoolSettings>(settings);
   const [savedNotification, setSavedNotification] = useState<boolean>(false);
@@ -272,9 +278,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             <div>
-              <label className="block font-semibold text-[#202B38] mb-1">
-                Academic Session <span className="text-[#C44949]">*</span>
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="block font-semibold text-[#202B38]">
+                  Academic Session <span className="text-[#C44949]">*</span>
+                </label>
+                {onOpenPromotionModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenPromotionModal}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#24364B] hover:underline"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>Promote Classes &amp; Rollover</span>
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 required
@@ -282,6 +300,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setFormData({ ...formData, academicSession: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] font-mono"
               />
+              <p className="text-[11px] text-[#75808C] mt-1">
+                This session is printed on all student ID cards and QR verification codes.
+              </p>
             </div>
 
             <div>
@@ -785,6 +806,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 />
               </label>
 
+              {onOpenPromotionModal && (
+                <button
+                  type="button"
+                  onClick={onOpenPromotionModal}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg"
+                >
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Class Promotion &amp; Rollover</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
@@ -856,10 +888,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="p-3.5 rounded-lg border border-[#E3E7EB] bg-white flex items-start gap-2.5 text-xs">
             <ShieldCheck className="w-4 h-4 text-[#25845A] shrink-0 mt-0.5" />
             <p className="text-[#536477] leading-relaxed">
-              Your workspace is strictly isolated to your Google account ID (
+              Your workspace is strictly isolated to your verified account ID (
               <span className="font-mono text-[#202B38]">{currentUser?.uid || '—'}</span>
-              ). Other users cannot view or sync your school records, and signing in with this same Google account on another device automatically keeps your students, settings, and templates synchronized.
+              ). Other users cannot view or sync your school records, and signing in with this same account on another device automatically keeps your students, settings, and templates synchronized.
             </p>
+          </div>
+        </CardSurface>
+
+        {/* 8. SOFTWARE DEVELOPER & SUPPORT */}
+        <CardSurface padding="lg" className="space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-[#E3E7EB]">
+            <Building2 className="w-4 h-4 text-[#A77C50]" />
+            <h3 className="text-sm font-bold text-[#202B38]">8. Developer &amp; Support</h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="p-3.5 rounded-lg bg-[#F5F6F7] border border-[#E3E7EB]">
+              <p className="text-[11px] font-medium text-[#75808C]">Developed By</p>
+              <p className="font-bold text-[#202B38] mt-1">Anivex Solution</p>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-[#F5F6F7] border border-[#E3E7EB]">
+              <p className="text-[11px] font-medium text-[#75808C]">Website</p>
+              <a
+                href="https://anivexsolution.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-semibold text-[#24364B] hover:underline mt-1"
+              >
+                <Globe className="w-3.5 h-3.5 text-[#75808C]" />
+                <span>anivexsolution.in</span>
+              </a>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-[#F5F6F7] border border-[#E3E7EB]">
+              <p className="text-[11px] font-medium text-[#75808C]">Support Email</p>
+              <a
+                href="mailto:info@anivexsolution.in"
+                className="inline-flex items-center gap-1.5 font-semibold text-[#24364B] hover:underline mt-1"
+              >
+                <Mail className="w-3.5 h-3.5 text-[#75808C]" />
+                <span>info@anivexsolution.in</span>
+              </a>
+            </div>
           </div>
         </CardSurface>
       </form>

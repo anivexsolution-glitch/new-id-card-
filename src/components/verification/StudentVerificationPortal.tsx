@@ -108,7 +108,7 @@ export const StudentVerificationPortal: React.FC<StudentVerificationPortalProps>
               </p>
               <div className="mt-2 inline-flex items-center gap-1.5 bg-amber-400 text-slate-950 font-bold text-[10px] tracking-wider uppercase px-3 py-0.5 rounded-full shadow-xs">
                 <ShieldCheck className="w-3 h-3 text-slate-950" />
-                <span>Verified Academic ID · Session {student.session}</span>
+                <span>Verified Academic ID · Session {schoolSettings.academicSession || student.session}</span>
               </div>
             </div>
           </div>
@@ -180,7 +180,7 @@ export const StudentVerificationPortal: React.FC<StudentVerificationPortalProps>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-slate-500 font-medium">Academic Session</span>
-                <span className="font-bold text-slate-900">{student.session}</span>
+                <span className="font-bold text-slate-900">{schoolSettings.academicSession || student.session}</span>
               </div>
             </div>
 

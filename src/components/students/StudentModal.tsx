@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { SchoolSettings, Student } from '../../types';
-import { X, Upload, User, AlertCircle } from 'lucide-react';
+import { CardStatus, SchoolSettings, Student } from '../../types';
+import { hasValidStudentPhoto, sanitizeStudentPhotoUrl } from '../../utils/photoUtils';
+import { X, Upload, User, AlertCircle, ShieldAlert } from 'lucide-react';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -32,6 +33,9 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     photoUrl: '',
     photoCrop: { zoom: 1, x: 0, y: 0 },
     emergencyContact: '',
+    cardStatus: 'active',
+    validUntil: schoolSettings.defaultCardValidUntil || '31/03/2026',
+    statusReason: '',
   });
 
   const [error, setError] = useState<string>('');
@@ -39,7 +43,13 @@ export const StudentModal: React.FC<StudentModalProps> = ({
 
   useEffect(() => {
     if (studentToEdit) {
-      setFormData(studentToEdit);
+      setFormData({
+        ...studentToEdit,
+        photoUrl: sanitizeStudentPhotoUrl(studentToEdit.photoUrl) || '',
+        cardStatus: studentToEdit.cardStatus || 'active',
+        validUntil: studentToEdit.validUntil || schoolSettings.defaultCardValidUntil || '',
+        statusReason: studentToEdit.statusReason || '',
+      });
     } else {
       setFormData({
         name: '',
@@ -56,6 +66,9 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         photoUrl: '',
         photoCrop: { zoom: 1, x: 0, y: 0 },
         emergencyContact: '',
+        cardStatus: 'active',
+        validUntil: schoolSettings.defaultCardValidUntil || '31/03/2026',
+        statusReason: '',
       });
     }
     setError('');
@@ -119,6 +132,10 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       return;
     }
 
+    const nextStatus = (formData.cardStatus || 'active') as CardStatus;
+    const statusChanged =
+      !studentToEdit || (studentToEdit.cardStatus || 'active') !== nextStatus;
+
     const studentRecord: Student = {
       id: studentToEdit ? studentToEdit.id : `std_${Date.now()}`,
       name: formData.name.trim(),
@@ -132,7 +149,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       rollNo: formData.rollNo?.trim(),
       classGrade: formData.classGrade?.trim(),
       bloodGroup: formData.bloodGroup?.trim(),
-      photoUrl: formData.photoUrl,
+      photoUrl: sanitizeStudentPhotoUrl(formData.photoUrl),
       photoCrop: formData.photoCrop || { zoom: 1, x: 0, y: 0 },
       idCardNumber:
         formData.idCardNumber ||
@@ -140,6 +157,13 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       emergencyContact: formData.emergencyContact?.trim() || formData.contactNumber.trim(),
       isCardGenerated: studentToEdit ? studentToEdit.isCardGenerated : false,
       createdAt: studentToEdit ? studentToEdit.createdAt : new Date().toISOString(),
+      cardStatus: nextStatus,
+      validUntil: formData.validUntil?.trim() || schoolSettings.defaultCardValidUntil || '',
+      statusReason: formData.statusReason?.trim() || '',
+      statusUpdatedAt: statusChanged
+        ? new Date().toISOString()
+        : studentToEdit?.statusUpdatedAt || new Date().toISOString(),
+      verificationId: studentToEdit?.verificationId,
     };
 
     onSave(studentRecord);
@@ -187,7 +211,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
           <div className="flex flex-col sm:flex-row items-start gap-5">
             <div className="flex flex-col items-center shrink-0">
               <div className="w-20 h-24 rounded-lg border border-[#E3E7EB] bg-[#F5F6F7] overflow-hidden flex items-center justify-center relative group">
-                {formData.photoUrl ? (
+                {hasValidStudentPhoto(formData.photoUrl) ? (
                   <img
                     src={formData.photoUrl}
                     alt="Preview"
@@ -212,7 +236,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 </label>
               </div>
 
-              <div className="flex items-center gap-2 mt-1.5">
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-1.5">
                 <label className="text-[11px] text-[#24364B] hover:underline cursor-pointer font-semibold">
                   Upload Photo
                   <input
@@ -222,14 +246,30 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                     className="hidden"
                   />
                 </label>
-                {formData.photoUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPhotoCrop(!showPhotoCrop)}
-                    className="text-[11px] text-[#536477] hover:text-[#202B38] underline"
-                  >
-                    Adjust
-                  </button>
+                {hasValidStudentPhoto(formData.photoUrl) && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowPhotoCrop(!showPhotoCrop)}
+                      className="text-[11px] text-[#536477] hover:text-[#202B38] underline"
+                    >
+                      Adjust
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          photoUrl: '',
+                          photoCrop: { zoom: 1, x: 0, y: 0 },
+                        }));
+                        setShowPhotoCrop(false);
+                      }}
+                      className="text-[11px] text-[#C44949] hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -439,6 +479,60 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               placeholder="e.g. Flat 402, Shanti Heights, Sector 14, Rohini, New Delhi - 110085"
               className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] resize-none"
             />
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-[#F5F6F7] border border-[#E3E7EB] space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#202B38]">
+              <ShieldAlert className="w-3.5 h-3.5 text-[#24364B]" />
+              <span>Card Validity &amp; Live QR Verification Status</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                  Valid Until (DD/MM/YYYY)
+                </label>
+                <input
+                  type="text"
+                  value={formData.validUntil || ''}
+                  onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
+                  placeholder={schoolSettings.defaultCardValidUntil || '31/03/2026'}
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] bg-white focus:outline-none focus:border-[#24364B] font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                  Card Status
+                </label>
+                <select
+                  value={formData.cardStatus || 'active'}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cardStatus: e.target.value as CardStatus })
+                  }
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] bg-white focus:outline-none focus:border-[#24364B]"
+                >
+                  <option value="active">Active &amp; Valid</option>
+                  <option value="lost">Reported Lost / Stolen</option>
+                  <option value="expired">Expired</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
+            </div>
+
+            {formData.cardStatus && formData.cardStatus !== 'active' && (
+              <div>
+                <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                  Status Reason / Incident Note (shown on QR scan)
+                </label>
+                <input
+                  type="text"
+                  value={formData.statusReason || ''}
+                  onChange={(e) => setFormData({ ...formData, statusReason: e.target.value })}
+                  placeholder="e.g. Reported lost on campus — replacement card issued"
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] bg-white focus:outline-none focus:border-[#24364B]"
+                />
+              </div>
+            )}
           </div>
 
           <div className="pt-4 border-t border-[#E3E7EB] flex items-center justify-end gap-2.5">

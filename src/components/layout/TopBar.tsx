@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ActiveNavTab, AuthenticatedUser, SchoolSettings, Student } from '../../types';
+import { hasValidStudentPhoto } from '../../utils/photoUtils';
 import {
   Menu,
   Search,
@@ -19,6 +20,7 @@ import {
 interface TopBarProps {
   activeTab: ActiveNavTab;
   onSelectTab: (tab: ActiveNavTab) => void;
+  onNavigateToStudents?: (filter: 'all' | 'generated' | 'pending' | 'missing_photo') => void;
   onOpenAddModal: () => void;
   onOpenMobileMenu: () => void;
   onSelectStudentForEditor: (studentId: string) => void;
@@ -32,6 +34,7 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({
   activeTab,
   onSelectTab,
+  onNavigateToStudents,
   onOpenAddModal,
   onOpenMobileMenu,
   onSelectStudentForEditor,
@@ -45,6 +48,28 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [textScale, setTextScale] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem('theidmaker_ui_text_scale'));
+      if (Number.isFinite(saved) && saved >= 85 && saved <= 125) return saved;
+    } catch {
+      // ignore storage errors
+    }
+    return 100;
+  });
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${textScale}%`;
+    try {
+      localStorage.setItem('theidmaker_ui_text_scale', String(textScale));
+    } catch {
+      // ignore storage errors
+    }
+  }, [textScale]);
+
+  const handleDecreaseText = () => setTextScale((s) => Math.max(85, s - 5));
+  const handleIncreaseText = () => setTextScale((s) => Math.min(125, s + 5));
+  const handleResetText = () => setTextScale(100);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -106,7 +131,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   // Real operational notifications derived from actual state
   const notifications = useMemo(() => {
     const list: { id: string; title: string; detail: string; actionTab: ActiveNavTab; tone: 'warning' | 'info' }[] = [];
-    const missingPhotos = students.filter((s) => !s.photoUrl).length;
+    const missingPhotos = students.filter((s) => !hasValidStudentPhoto(s.photoUrl)).length;
     const pendingCards = students.filter((s) => !s.isCardGenerated).length;
 
     if (missingPhotos > 0) {
@@ -215,6 +240,43 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
         </div>
 
+        {/* Text Size Decrease / Increase Controls */}
+        <div
+          role="group"
+          aria-label="Text size controls"
+          className="inline-flex items-center h-9 rounded-lg border border-[#E3E7EB] bg-white overflow-hidden shrink-0"
+        >
+          <button
+            type="button"
+            onClick={handleDecreaseText}
+            disabled={textScale <= 85}
+            title="Decrease text size"
+            aria-label="Decrease text size"
+            className="h-full px-2.5 text-xs font-bold text-[#536477] hover:text-[#202B38] hover:bg-[#F5F6F7] disabled:opacity-40 disabled:cursor-not-allowed transition-colors border-r border-[#E3E7EB]"
+          >
+            A-
+          </button>
+          <button
+            type="button"
+            onClick={handleResetText}
+            title="Reset text size to 100%"
+            aria-label={`Current text size ${textScale} percent, click to reset`}
+            className="hidden sm:inline-flex items-center justify-center h-full px-2 text-[11px] font-mono tabular-nums text-[#75808C] hover:text-[#202B38] hover:bg-[#F5F6F7] transition-colors border-r border-[#E3E7EB]"
+          >
+            {textScale}%
+          </button>
+          <button
+            type="button"
+            onClick={handleIncreaseText}
+            disabled={textScale >= 125}
+            title="Increase text size"
+            aria-label="Increase text size"
+            className="h-full px-2.5 text-xs font-bold text-[#536477] hover:text-[#202B38] hover:bg-[#F5F6F7] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            A+
+          </button>
+        </div>
+
         {/* Operational Notifications */}
         <div ref={notifRef} className="relative">
           <button
@@ -249,7 +311,11 @@ export const TopBar: React.FC<TopBarProps> = ({
                       key={n.id}
                       type="button"
                       onClick={() => {
-                        onSelectTab(n.actionTab);
+                        if (n.id === 'missing_photos' && onNavigateToStudents) {
+                          onNavigateToStudents('missing_photo');
+                        } else {
+                          onSelectTab(n.actionTab);
+                        }
                         setShowNotifications(false);
                       }}
                       className="w-full px-4 py-3 text-left hover:bg-[#F5F6F7] flex items-start gap-2.5 transition-colors"
@@ -288,11 +354,11 @@ export const TopBar: React.FC<TopBarProps> = ({
               />
             ) : (
               <div className="w-6 h-6 rounded-md bg-[#24364B] text-white text-[11px] font-bold flex items-center justify-center uppercase">
-                {(currentUser?.displayName || currentUser?.email || 'U').charAt(0)}
+                {(currentUser?.displayName || currentUser?.email || currentUser?.phoneNumber || 'U').charAt(0)}
               </div>
             )}
             <span className="hidden xl:inline text-xs font-semibold text-[#202B38] max-w-[130px] truncate">
-              {currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Account'}
+              {currentUser?.displayName || currentUser?.email?.split('@')[0] || currentUser?.phoneNumber || 'Account'}
             </span>
           </button>
 
@@ -300,10 +366,10 @@ export const TopBar: React.FC<TopBarProps> = ({
             <div className="absolute right-0 mt-1.5 w-60 bg-white border border-[#E3E7EB] rounded-[10px] shadow-lg py-1.5 z-40">
               <div className="px-3.5 py-2 border-b border-[#E3E7EB]">
                 <p className="text-xs font-semibold text-[#202B38] truncate">
-                  {currentUser?.displayName || 'Signed-in User'}
+                  {currentUser?.displayName || currentUser?.phoneNumber || 'Signed-in User'}
                 </p>
                 <p className="text-[11px] text-[#75808C] truncate">
-                  {currentUser?.email || schoolSettings.schoolName}
+                  {currentUser?.email || currentUser?.phoneNumber || schoolSettings.schoolName}
                 </p>
               </div>
               <button

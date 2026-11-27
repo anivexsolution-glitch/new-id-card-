@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { DEMO_STUDENTS, TEMPLATE_REGISTRY } from '../../constants/initialData';
 import { CR80Card } from '../cards/CR80Card';
+import { hasValidStudentPhoto } from '../../utils/photoUtils';
 import { CardSurface, StatusText } from '../ui/EnterpriseUI';
 import {
   Users,
@@ -35,6 +36,7 @@ interface DashboardViewProps {
   exportHistory?: ExportHistoryRecord[];
   isDemoMode?: boolean;
   onNavigate: (tab: ActiveNavTab) => void;
+  onNavigateToStudents?: (filter: 'all' | 'generated' | 'pending' | 'missing_photo') => void;
   onSelectStudentForEditor: (studentId: string) => void;
   onOpenAddModal?: () => void;
   onResetToDemo?: () => void;
@@ -50,6 +52,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   exportHistory = [],
   isDemoMode = false,
   onNavigate,
+  onNavigateToStudents,
   onSelectStudentForEditor,
   onOpenAddModal,
   onResetToDemo,
@@ -58,7 +61,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalStudents = students.length;
   const generatedCount = students.filter((s) => s.isCardGenerated).length;
   const pendingCount = totalStudents - generatedCount;
-  const missingPhotosCount = students.filter((s) => !s.photoUrl).length;
+  const missingPhotosCount = students.filter((s) => !hasValidStudentPhoto(s.photoUrl)).length;
 
   const sampleStudent = students[0] || DEMO_STUDENTS[0];
   const currentTemplateMeta = TEMPLATE_REGISTRY.find(
@@ -87,7 +90,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const entry = map.get(cls) || { total: 0, generated: 0, missingPhotos: 0 };
       entry.total += 1;
       if (s.isCardGenerated) entry.generated += 1;
-      if (!s.photoUrl) entry.missingPhotos += 1;
+      if (!hasValidStudentPhoto(s.photoUrl)) entry.missingPhotos += 1;
       map.set(cls, entry);
     });
     return Array.from(map.entries())
@@ -165,7 +168,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#202B38] tracking-tight">
-            Welcome back, {currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Administrator'}
+            Welcome back, {currentUser?.displayName || currentUser?.email?.split('@')[0] || currentUser?.phoneNumber || 'Administrator'}
           </h1>
         </div>
 
@@ -204,59 +207,91 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Real-Data Statistics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <CardSurface padding="md">
-          <div className="flex items-center justify-between text-[#75808C]">
-            <span className="text-xs font-medium">Total Students</span>
-            <Users className="w-4 h-4 text-[#536477]" />
-          </div>
-          <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
-            {totalStudents}
-          </div>
-          <p className="text-xs text-[#75808C] mt-1">
-            {classSummary.length} {classSummary.length === 1 ? 'class' : 'classes'} recorded
-          </p>
-        </CardSurface>
+        <button
+          type="button"
+          onClick={() =>
+            onNavigateToStudents ? onNavigateToStudents('all') : onNavigate('students')
+          }
+          className="text-left focus:outline-none group"
+        >
+          <CardSurface padding="md" className="h-full group-hover:border-[#24364B]/45 transition-colors">
+            <div className="flex items-center justify-between text-[#75808C]">
+              <span className="text-xs font-medium">Total Students</span>
+              <Users className="w-4 h-4 text-[#536477]" />
+            </div>
+            <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
+              {totalStudents}
+            </div>
+            <p className="text-xs text-[#75808C] mt-1">
+              {classSummary.length} {classSummary.length === 1 ? 'class' : 'classes'} recorded
+            </p>
+          </CardSurface>
+        </button>
 
-        <CardSurface padding="md">
-          <div className="flex items-center justify-between text-[#75808C]">
-            <span className="text-xs font-medium">Generated ID Cards</span>
-            <CheckCircle2 className="w-4 h-4 text-[#25845A]" />
-          </div>
-          <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
-            {generatedCount}
-          </div>
-          <p className="text-xs text-[#25845A] font-medium mt-1 tabular-nums">
-            {totalStudents > 0
-              ? `${Math.round((generatedCount / totalStudents) * 100)}% of roster ready`
-              : 'No student records'}
-          </p>
-        </CardSurface>
+        <button
+          type="button"
+          onClick={() =>
+            onNavigateToStudents ? onNavigateToStudents('generated') : onNavigate('students')
+          }
+          className="text-left focus:outline-none group"
+        >
+          <CardSurface padding="md" className="h-full group-hover:border-[#24364B]/45 transition-colors">
+            <div className="flex items-center justify-between text-[#75808C]">
+              <span className="text-xs font-medium">Generated ID Cards</span>
+              <CheckCircle2 className="w-4 h-4 text-[#25845A]" />
+            </div>
+            <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
+              {generatedCount}
+            </div>
+            <p className="text-xs text-[#25845A] font-medium mt-1 tabular-nums">
+              {totalStudents > 0
+                ? `${Math.round((generatedCount / totalStudents) * 100)}% of roster ready`
+                : 'No student records'}
+            </p>
+          </CardSurface>
+        </button>
 
-        <CardSurface padding="md">
-          <div className="flex items-center justify-between text-[#75808C]">
-            <span className="text-xs font-medium">Pending ID Cards</span>
-            <Clock className="w-4 h-4 text-[#C18A38]" />
-          </div>
-          <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
-            {pendingCount}
-          </div>
-          <p className="text-xs text-[#75808C] mt-1">
-            {pendingCount === 0 ? 'No pending approvals' : 'Awaiting batch generation'}
-          </p>
-        </CardSurface>
+        <button
+          type="button"
+          onClick={() =>
+            onNavigateToStudents ? onNavigateToStudents('pending') : onNavigate('students')
+          }
+          className="text-left focus:outline-none group"
+        >
+          <CardSurface padding="md" className="h-full group-hover:border-[#24364B]/45 transition-colors">
+            <div className="flex items-center justify-between text-[#75808C]">
+              <span className="text-xs font-medium">Pending ID Cards</span>
+              <Clock className="w-4 h-4 text-[#C18A38]" />
+            </div>
+            <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
+              {pendingCount}
+            </div>
+            <p className="text-xs text-[#75808C] mt-1">
+              {pendingCount === 0 ? 'No pending approvals' : 'Awaiting batch generation'}
+            </p>
+          </CardSurface>
+        </button>
 
-        <CardSurface padding="md">
-          <div className="flex items-center justify-between text-[#75808C]">
-            <span className="text-xs font-medium">Missing Student Photos</span>
-            <ImageOff className="w-4 h-4 text-[#C44949]" />
-          </div>
-          <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
-            {missingPhotosCount}
-          </div>
-          <p className="text-xs text-[#75808C] mt-1">
-            {missingPhotosCount === 0 ? 'All portraits uploaded' : 'Upload via Students or ZIP'}
-          </p>
-        </CardSurface>
+        <button
+          type="button"
+          onClick={() =>
+            onNavigateToStudents ? onNavigateToStudents('missing_photo') : onNavigate('students')
+          }
+          className="text-left focus:outline-none group"
+        >
+          <CardSurface padding="md" className="h-full group-hover:border-[#C44949]/50 transition-colors">
+            <div className="flex items-center justify-between text-[#75808C]">
+              <span className="text-xs font-medium">Missing Student Photos</span>
+              <ImageOff className="w-4 h-4 text-[#C44949]" />
+            </div>
+            <div className="text-2xl font-bold text-[#202B38] tabular-nums mt-2">
+              {missingPhotosCount}
+            </div>
+            <p className="text-xs text-[#75808C] mt-1">
+              {missingPhotosCount === 0 ? 'All portraits uploaded' : 'Click to view & upload photos'}
+            </p>
+          </CardSurface>
+        </button>
       </div>
 
       {/* Main Content Split */}

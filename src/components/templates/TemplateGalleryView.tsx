@@ -3,7 +3,7 @@ import { ActiveNavTab, SchoolSettings, Student, TemplateDefinition, TemplateId }
 import { TEMPLATE_REGISTRY, DEMO_STUDENTS } from '../../constants/initialData';
 import { CR80Card } from '../cards/CR80Card';
 import { PageHeader, EmptyState } from '../ui/EnterpriseUI';
-import { ArrowUpRight, Check, Eye, Search, Sliders, X, Layers } from 'lucide-react';
+import { ArrowUpRight, Check, Eye, Search, Sliders, X, Layers, Sparkles } from 'lucide-react';
 
 interface TemplateGalleryViewProps {
   schoolSettings: SchoolSettings;
@@ -11,6 +11,7 @@ interface TemplateGalleryViewProps {
   onSetDefaultTemplate: (templateId: TemplateId) => void;
   onNavigate: (tab: ActiveNavTab) => void;
   onSelectTemplateForEditor: (templateId: TemplateId) => void;
+  onOpenSmartGenerator?: () => void;
 }
 
 const styleLabels: Record<string, string> = {
@@ -28,6 +29,7 @@ export const TemplateGalleryView: React.FC<TemplateGalleryViewProps> = ({
   onSetDefaultTemplate,
   onNavigate,
   onSelectTemplateForEditor,
+  onOpenSmartGenerator,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeOrientation, setActiveOrientation] = useState<'all' | 'portrait' | 'landscape'>('all');
@@ -84,14 +86,26 @@ export const TemplateGalleryView: React.FC<TemplateGalleryViewProps> = ({
           </span>
         }
         actions={
-          <button
-            type="button"
-            onClick={() => openEditor(schoolSettings.defaultTemplateId)}
-            className="h-9 px-4 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg flex items-center gap-1.5 transition-colors"
-          >
-            <Sliders className="w-4 h-4" />
-            <span>Customize Active Design</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenSmartGenerator && (
+              <button
+                type="button"
+                onClick={onOpenSmartGenerator}
+                className="h-9 px-3.5 text-xs font-semibold text-[#202B38] bg-white border border-[#E3E7EB] hover:bg-[#F5F6F7] rounded-lg flex items-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#A77C50]" />
+                <span>Smart Logo Generator</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => openEditor(schoolSettings.defaultTemplateId)}
+              className="h-9 px-4 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg flex items-center gap-1.5 transition-colors"
+            >
+              <Sliders className="w-4 h-4" />
+              <span>Customize Active Design</span>
+            </button>
+          </div>
         }
       />
 

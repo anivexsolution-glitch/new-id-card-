@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student } from '../types';
+import { sanitizeStudentPhotoUrl } from './photoUtils';
 
 export interface ColumnMapping {
   name: string;
@@ -272,7 +273,7 @@ export const validateMappedRows = (
       rollNo: rollNo || undefined,
       classGrade: classGrade || undefined,
       bloodGroup: bloodGroup || undefined,
-      photoUrl: photoUrl || undefined,
+      photoUrl: sanitizeStudentPhotoUrl(photoUrl),
       idCardNumber: `SCH-${session.split('-')[0] || '2025'}-${String(idx + 101).padStart(4, '0')}`,
       isCardGenerated: false,
       createdAt: new Date().toISOString(),

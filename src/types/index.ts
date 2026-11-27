@@ -1,3 +1,5 @@
+export type CardStatus = 'active' | 'lost' | 'expired' | 'suspended';
+
 export interface Student {
   id: string;
   name: string;
@@ -21,7 +23,40 @@ export interface Student {
   emergencyContact?: string;
   isCardGenerated?: boolean;
   generatedDate?: string;
+  cardStatus?: CardStatus;
+  validUntil?: string;
+  statusReason?: string;
+  statusUpdatedAt?: string;
+  verificationId?: string;
   createdAt: string;
+}
+
+export interface PublicVerificationRecord {
+  verifyId: string;
+  ownerId: string;
+  studentId: string;
+  idCardNumber: string;
+  name: string;
+  fatherName: string;
+  motherName?: string;
+  dob?: string;
+  classGrade: string;
+  rollNo: string;
+  conveyance: 'Yes' | 'No';
+  session: string;
+  cardStatus: CardStatus;
+  validUntil: string;
+  statusReason: string;
+  statusUpdatedAt: string;
+  schoolName: string;
+  schoolCode: string;
+  schoolAddress: string;
+  schoolContact: string;
+  schoolEmail: string;
+  schoolLogoUrl: string;
+  photoUrl: string;
+  maskedContact: string;
+  maskedAddress: string;
 }
 
 export interface SchoolSettings {
@@ -33,6 +68,7 @@ export interface SchoolSettings {
   email: string;
   website: string;
   academicSession: string;
+  defaultCardValidUntil?: string;
   logoUrl: string;
   principalSignatureUrl: string;
   principalName: string;
@@ -57,6 +93,7 @@ export interface SchoolSettings {
     address: boolean;
     conveyance: boolean;
     session: boolean;
+    validUntil?: boolean;
     rollNo: boolean;
     classGrade: boolean;
     bloodGroup: boolean;
@@ -70,7 +107,7 @@ export interface SchoolSettings {
 
 export type PrinterPreset =
   | 'a4_8_landscape'
-  | 'a4_6_portrait'
+  | 'a4_9_portrait'
   | 'a4_10_compact'
   | 'pvc_tray_5'
   | 'pvc_tray_2'
@@ -223,5 +260,36 @@ export interface AuthenticatedUser {
   email?: string | null;
   displayName?: string | null;
   photoURL?: string | null;
+  phoneNumber?: string | null;
   emailVerified?: boolean;
 }
+
+export interface SmartTemplatePalette {
+  dominantHex: string;
+  secondaryHex: string;
+  accentHex: string;
+  colorMood: string;
+}
+
+export interface SmartTemplateSuggestion {
+  id: string;
+  title: string;
+  rationale: string;
+  templateId: TemplateId;
+  orientation: 'portrait' | 'landscape';
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  surfaceColor: string;
+  headingFontId: string;
+  bodyFontId: string;
+  logoShape: 'circle' | 'rounded' | 'square' | 'none';
+  logoBadgeStyle: 'gold-ring' | 'white' | 'tinted' | 'minimal';
+  photoRadius: number;
+}
+
+export interface SmartTemplateResponse {
+  extractedPalette: SmartTemplatePalette;
+  suggestions: SmartTemplateSuggestion[];
+}
+

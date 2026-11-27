@@ -23,6 +23,7 @@ import {
   Student,
 } from '../types';
 import { DEFAULT_SCHOOL_SETTINGS, DEMO_STUDENTS } from '../constants/initialData';
+import { sanitizeStudentPhotoUrl } from './photoUtils';
 
 const MAX_DATA_URL_CHARS = 240000;
 
@@ -200,7 +201,9 @@ function buildSanitizedStudentFields(uid: string, student: Student) {
   if (student.rollNo !== undefined) payload.rollNo = clampStr(student.rollNo, 40);
   if (student.classGrade !== undefined) payload.classGrade = clampStr(student.classGrade, 60);
   if (student.bloodGroup !== undefined) payload.bloodGroup = clampStr(student.bloodGroup, 16);
-  if (student.photoUrl !== undefined) payload.photoUrl = clampStr(student.photoUrl, 260000);
+  if (student.photoUrl !== undefined) {
+    payload.photoUrl = clampStr(sanitizeStudentPhotoUrl(student.photoUrl) ?? '', 260000);
+  }
   if (student.photoCrop) {
     payload.photoCrop = {
       zoom: Number.isFinite(student.photoCrop.zoom) ? student.photoCrop.zoom : 1,
@@ -268,7 +271,9 @@ function hydrateStudentFromDoc(data: Record<string, unknown>): Student {
     rollNo: data.rollNo !== undefined ? String(data.rollNo) : undefined,
     classGrade: data.classGrade !== undefined ? String(data.classGrade) : undefined,
     bloodGroup: data.bloodGroup !== undefined ? String(data.bloodGroup) : undefined,
-    photoUrl: data.photoUrl !== undefined ? String(data.photoUrl) : undefined,
+    photoUrl: sanitizeStudentPhotoUrl(
+      data.photoUrl != null ? String(data.photoUrl) : undefined
+    ),
     photoCrop: data.photoCrop as Student['photoCrop'],
     idCardNumber: data.idCardNumber !== undefined ? String(data.idCardNumber) : undefined,
     emergencyContact: data.emergencyContact !== undefined ? String(data.emergencyContact) : undefined,
@@ -325,8 +330,12 @@ export async function ensureUserWorkspace(user: User): Promise<void> {
     const profilePayload = {
       uid,
       email: clampStr(user.email || '', 254),
-      displayName: clampStr(user.displayName || user.email?.split('@')[0] || 'Administrator', 120),
+      displayName: clampStr(
+        user.displayName || user.email?.split('@')[0] || user.phoneNumber || 'Administrator',
+        120
+      ),
       ...(user.photoURL ? { photoURL: clampStr(user.photoURL, 1024) } : {}),
+      ...(user.phoneNumber ? { phoneNumber: clampStr(user.phoneNumber, 32) } : {}),
     };
 
     if (!userSnap.exists()) {
@@ -378,6 +387,7 @@ export async function ensureUserWorkspace(user: User): Promise<void> {
         email: profilePayload.email,
         displayName: profilePayload.displayName,
         ...(profilePayload.photoURL ? { photoURL: profilePayload.photoURL } : {}),
+        ...(profilePayload.phoneNumber ? { phoneNumber: profilePayload.phoneNumber } : {}),
         updatedAt: serverTimestamp(),
       });
 
@@ -548,8 +558,9 @@ export async function updateDemoModeCloud(uid: string, isDemoMode: boolean): Pro
 }
 
 export async function upsertStudentCloud(uid: string, student: Student): Promise<void> {
-  const cleanPhoto = student.photoUrl
-    ? await compressImageForFirestore(student.photoUrl, { maxDim: 420, preserveAlpha: false })
+  const validPhoto = sanitizeStudentPhotoUrl(student.photoUrl);
+  const cleanPhoto = validPhoto
+    ? await compressImageForFirestore(validPhoto, { maxDim: 420, preserveAlpha: false })
     : undefined;
   const { safeId, payload } = buildSanitizedStudentFields(uid, {
     ...student,
@@ -648,6 +659,72 @@ export async function bulkMarkGeneratedCloud(
   }
 }
 
+export interface StudentRolloverPatch {
+  id: string;
+  classGrade?: string;
+  session: string;
+  isCardGenerated: boolean;
+  generatedDate: string;
+}
+
+export async function promoteStudentsRolloverCloud(
+  uid: string,
+  updates: StudentRolloverPatch[],
+  removeIds: string[],
+  nextSettings: SchoolSettings | null,
+  isDemoMode: boolean
+): Promise<void> {
+  const path = `users/${uid}/students`;
+  try {
+    type BatchOp =
+      | { type: 'update'; id: string; data: Record<string, unknown> }
+      | { type: 'delete'; id: string };
+
+    const ops: BatchOp[] = [
+      ...updates.map((u) => {
+        const data: Record<string, unknown> = {
+          session: clampStr(u.session, 40),
+          isCardGenerated: Boolean(u.isCardGenerated),
+          generatedDate: clampStr(u.generatedDate, 32),
+          updatedAt: serverTimestamp(),
+        };
+        if (u.classGrade !== undefined) {
+          data.classGrade = clampStr(u.classGrade, 60);
+        }
+        return {
+          type: 'update' as const,
+          id: sanitizeDocId(u.id, 'std'),
+          data,
+        };
+      }),
+      ...removeIds.map((rawId) => ({
+        type: 'delete' as const,
+        id: sanitizeDocId(rawId, 'std'),
+      })),
+    ];
+
+    const chunkSize = 400;
+    for (let i = 0; i < ops.length; i += chunkSize) {
+      const batch = writeBatch(db);
+      for (const op of ops.slice(i, i + chunkSize)) {
+        const ref = doc(db, 'users', uid, 'students', op.id);
+        if (op.type === 'update') {
+          batch.update(ref, op.data);
+        } else {
+          batch.delete(ref);
+        }
+      }
+      await batch.commit();
+    }
+
+    if (nextSettings) {
+      await saveUserSettingsCloud(uid, nextSettings, isDemoMode);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
 export async function syncStudentsBulkCloud(
   uid: string,
   nextStudents: Student[],
@@ -662,8 +739,9 @@ export async function syncStudentsBulkCloud(
 
     const prepared = await Promise.all(
       nextStudents.map(async (student) => {
-        const cleanPhoto = student.photoUrl
-          ? await compressImageForFirestore(student.photoUrl, { maxDim: 420, preserveAlpha: false })
+        const validPhoto = sanitizeStudentPhotoUrl(student.photoUrl);
+        const cleanPhoto = validPhoto
+          ? await compressImageForFirestore(validPhoto, { maxDim: 420, preserveAlpha: false })
           : undefined;
         return buildSanitizedStudentFields(uid, {
           ...student,

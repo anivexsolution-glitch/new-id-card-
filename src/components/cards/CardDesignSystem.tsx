@@ -2,6 +2,7 @@ import React, { createContext, useContext, useId, useMemo } from 'react';
 import QRCode from 'qrcode';
 import { SchoolSettings, Student, TemplateId } from '../../types';
 import { TEMPLATE_REGISTRY } from '../../constants/initialData';
+import { hasValidStudentPhoto } from '../../utils/photoUtils';
 
 const SANS = "'Plus Jakarta Sans', 'Inter', Arial, Helvetica, sans-serif";
 
@@ -295,7 +296,7 @@ export function Photo({
       </defs>
       <rect x={x} y={y} width={width} height={height} rx={radius} fill="#e7eae6" />
       <g clipPath={`url(#${clip})`}>
-        {student.photoUrl ? (
+        {hasValidStudentPhoto(student.photoUrl) ? (
           <image
             href={student.photoUrl}
             x={x}
@@ -692,7 +693,7 @@ export function buildStudentQrPayload(student: Student, schoolSettings?: SchoolS
     student.dob ? `DOB: ${student.dob}` : '',
     student.contactNumber ? `Phone: ${student.contactNumber}` : '',
     `Conveyance: ${student.conveyance === 'Yes' ? 'Yes' : 'No'}`,
-    `Session: ${student.session || schoolSettings?.academicSession || ''}`,
+    `Session: ${schoolSettings?.academicSession || student.session || ''}`,
     student.address ? `Address: ${student.address}` : '',
     schoolSettings?.schoolName ? `School: ${schoolSettings.schoolName}` : '',
   ].filter(Boolean);

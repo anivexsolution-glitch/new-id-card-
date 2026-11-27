@@ -1,5 +1,6 @@
 import { CardCustomization, SchoolSettings, Student, TemplateId } from '../../types';
 import { CardCanvas, TextBlock, Logo, Signature, CardCode, getPalette } from './CardDesignSystem';
+import { hasValidStudentPhoto } from '../../utils/photoUtils';
 
 export interface CardRenderProps {
   student: Student;
@@ -19,7 +20,7 @@ export interface CardRenderProps {
 export const StudentPhoto: React.FC<{ student: Student; className?: string; borderClass?: string }> = ({ student, className = 'w-16 h-20', borderClass = 'border border-slate-200' }) => {
   const crop = student.photoCrop || { zoom: 1, x: 0, y: 0 };
   return <div className={`relative overflow-hidden bg-slate-100 flex items-center justify-center shrink-0 ${borderClass} ${className}`}>
-    {student.photoUrl ? <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" style={{ transform: `scale(${crop.zoom || 1}) translate(${crop.x || 0}%, ${crop.y || 0}%)` }} /> : <span className="text-xs text-slate-400">Photo</span>}
+    {hasValidStudentPhoto(student.photoUrl) ? <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" style={{ transform: `scale(${crop.zoom || 1}) translate(${crop.x || 0}%, ${crop.y || 0}%)` }} /> : <span className="text-xs text-slate-400">Photo</span>}
   </div>;
 };
 export const SchoolLogo: React.FC<{ schoolSettings: SchoolSettings; className?: string }> = ({ schoolSettings, className = 'w-9 h-9' }) => <div className={`shrink-0 bg-white flex items-center justify-center ${className}`}>
@@ -88,7 +89,7 @@ export const CardBackSide: React.FC<CardRenderProps & { orientation: 'portrait' 
       <CardCode student={student} schoolSettings={schoolSettings} x={inset} y={h - 126} width={portrait ? 290 : 350} height={72} enabled={showBarcode} />
       {showSignature && <Signature schoolSettings={schoolSettings} x={w - 184} y={h - 122} width={cust?.signatureWidth || 144} height={cust?.signatureHeight || 62} title={cust?.signatureTitle || 'PRINCIPAL'} fill={ink} />}
       <rect x={0} y={h - 34} width={w} height={34} fill={ink} />
-      <TextBlock text={visibleFields.session !== false ? `ACADEMIC SESSION  ${student.session || schoolSettings.academicSession}` : 'STUDENT IDENTITY CARD'} x={inset} y={h - 24} width={content} fontSize={14} weight={700} fill={p.onInk} letterSpacing={1.4} maxLines={1} />
+      <TextBlock text={visibleFields.session !== false ? `ACADEMIC SESSION  ${schoolSettings.academicSession || student.session}` : 'STUDENT IDENTITY CARD'} x={inset} y={h - 24} width={content} fontSize={14} weight={700} fill={p.onInk} letterSpacing={1.4} maxLines={1} />
     </CardCanvas>
   );
 };

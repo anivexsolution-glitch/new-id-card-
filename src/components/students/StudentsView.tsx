@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ActiveNavTab, ExportHistoryRecord, SchoolSettings, Student } from '../../types';
 import { CR80Card } from '../cards/CR80Card';
-import { exportElementAsPng, exportSingleCardPdf } from '../../utils/export';
+import { exportElementAsPng, exportSingleCardPdf, formatExportError } from '../../utils/export';
+import { hasValidStudentPhoto } from '../../utils/photoUtils';
 import { BulkPhotoZipModal } from '../import/BulkPhotoZipModal';
 import { CardSurface, EmptyState, PageHeader, StatusText } from '../ui/EnterpriseUI';
 import {
@@ -24,6 +25,7 @@ import {
   MoreHorizontal,
   Users,
   Edit3,
+  GraduationCap,
 } from 'lucide-react';
 
 interface StudentsViewProps {
@@ -41,6 +43,11 @@ interface StudentsViewProps {
   onUpdateStudentPhoto?: (studentId: string, photoUrl: string) => void;
   onUpdateStudentsBulk?: (students: Student[]) => void;
   onLogExport?: (entry: Omit<ExportHistoryRecord, 'id' | 'timestamp'>) => void;
+  onOpenPromotionModal?: () => void;
+  initialStatusFilter?: {
+    value: 'all' | 'generated' | 'pending' | 'missing_photo';
+    nonce: number;
+  } | null;
 }
 
 function parseClassAndSection(classGrade?: string): { className: string; section: string } {
@@ -72,15 +79,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   onUpdateStudentPhoto,
   onUpdateStudentsBulk,
   onLogExport,
+  onOpenPromotionModal,
+  initialStatusFilter,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [sectionFilter, setSectionFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'generated' | 'pending' | 'missing_photo'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'generated' | 'pending' | 'missing_photo'>(
+    initialStatusFilter?.value || 'all'
+  );
   const [conveyanceFilter, setConveyanceFilter] = useState<'all' | 'Yes' | 'No'>('all');
   const [sortField, setSortField] = useState<'name' | 'rollNo' | 'classGrade'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [brokenPhotoIds, setBrokenPhotoIds] = useState<Record<string, boolean>>({});
   const [isZipModalOpen, setIsZipModalOpen] = useState(false);
   const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
   const secondaryMenuRef = useRef<HTMLDivElement>(null);
@@ -92,6 +104,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front');
   const [isExporting, setIsExporting] = useState(false);
   const cardPreviewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialStatusFilter) {
+      setStatusFilter(initialStatusFilter.value);
+      setCurrentPage(1);
+    }
+  }, [initialStatusFilter]);
+
+  useEffect(() => {
+    setBrokenPhotoIds({});
+  }, [students]);
 
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
@@ -136,11 +159,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
       const matchSection = sectionFilter === 'all' || section === sectionFilter;
       const matchConveyance = conveyanceFilter === 'all' || s.conveyance === conveyanceFilter;
 
+      const hasPhoto = hasValidStudentPhoto(s.photoUrl) && !brokenPhotoIds[s.id];
+
       const matchStatus =
         statusFilter === 'all' ||
         (statusFilter === 'generated' && s.isCardGenerated) ||
         (statusFilter === 'pending' && !s.isCardGenerated) ||
-        (statusFilter === 'missing_photo' && !s.photoUrl);
+        (statusFilter === 'missing_photo' && !hasPhoto);
 
       return matchSearch && matchClass && matchSection && matchConveyance && matchStatus;
     });
@@ -162,6 +187,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     statusFilter,
     sortField,
     sortOrder,
+    brokenPhotoIds,
   ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
@@ -264,7 +290,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         orientation: schoolSettings.defaultOrientation,
       });
     } catch (e) {
-      console.error(e);
+      console.warn('PNG export failed:', formatExportError(e));
     } finally {
       setIsExporting(false);
     }
@@ -288,7 +314,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         orientation: schoolSettings.defaultOrientation,
       });
     } catch (e) {
-      console.error(e);
+      console.warn('PDF export failed:', formatExportError(e));
     } finally {
       setIsExporting(false);
     }
@@ -381,6 +407,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                     <FileArchive className="w-3.5 h-3.5 text-[#536477]" />
                     <span>Bulk Photo Upload (ZIP)</span>
                   </button>
+                  {onOpenPromotionModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSecondaryMenuOpen(false);
+                        onOpenPromotionModal();
+                      }}
+                      className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#202B38] hover:bg-[#F5F6F7] flex items-center gap-2.5 border-t border-[#E3E7EB] mt-1 pt-2"
+                    >
+                      <GraduationCap className="w-3.5 h-3.5 text-[#24364B]" />
+                      <span>Class Promotion &amp; Rollover</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -656,10 +695,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                         <td className="px-3.5">
                           <div className="flex items-center gap-3">
                             <div className="relative group w-9 h-9 shrink-0">
-                              {student.photoUrl ? (
+                              {hasValidStudentPhoto(student.photoUrl) && !brokenPhotoIds[student.id] ? (
                                 <img
                                   src={student.photoUrl}
                                   alt={student.name}
+                                  onError={() =>
+                                    setBrokenPhotoIds((prev) => ({ ...prev, [student.id]: true }))
+                                  }
                                   className="w-9 h-9 rounded-lg object-cover border border-[#E3E7EB]"
                                   referrerPolicy="no-referrer"
                                 />
@@ -715,7 +757,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                               tone={student.isCardGenerated ? 'success' : 'warning'}
                               label={student.isCardGenerated ? 'Generated' : 'Pending'}
                             />
-                            {!student.photoUrl && (
+                            {(!hasValidStudentPhoto(student.photoUrl) || brokenPhotoIds[student.id]) && (
                               <span className="block text-[10px] font-medium text-[#C44949] mt-0.5">
                                 Missing photo
                               </span>
@@ -836,10 +878,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                         onChange={() => handleToggleSelect(student.id)}
                         className="rounded border-[#E3E7EB] accent-[#24364B] shrink-0"
                       />
-                      {student.photoUrl ? (
+                      {hasValidStudentPhoto(student.photoUrl) && !brokenPhotoIds[student.id] ? (
                         <img
                           src={student.photoUrl}
                           alt={student.name}
+                          onError={() =>
+                            setBrokenPhotoIds((prev) => ({ ...prev, [student.id]: true }))
+                          }
                           className="w-10 h-10 rounded-lg object-cover border border-[#E3E7EB] shrink-0"
                           referrerPolicy="no-referrer"
                         />

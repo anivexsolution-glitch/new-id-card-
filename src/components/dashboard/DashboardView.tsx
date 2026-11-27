@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   ActiveNavTab,
+  AuthenticatedUser,
   ExportHistoryRecord,
   SavedCustomTemplate,
   SchoolSettings,
@@ -29,6 +30,7 @@ import {
 interface DashboardViewProps {
   students: Student[];
   schoolSettings: SchoolSettings;
+  currentUser?: AuthenticatedUser | null;
   savedCustomTemplates?: SavedCustomTemplate[];
   exportHistory?: ExportHistoryRecord[];
   isDemoMode?: boolean;
@@ -43,6 +45,7 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   students,
   schoolSettings,
+  currentUser,
   savedCustomTemplates = [],
   exportHistory = [],
   isDemoMode = false,
@@ -162,7 +165,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#202B38] tracking-tight">
-            Welcome back, {schoolSettings.adminUsername || 'Administrator'}
+            Welcome back, {currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Administrator'}
           </h1>
         </div>
 

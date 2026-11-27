@@ -6,15 +6,32 @@ import { jsPDF } from 'jspdf';
  * Natively supports modern CSS color formats (oklch, oklab, color-mix)
  * and SVG filters/defs without parser exceptions.
  */
+function hasRestrictedStylesheet(): boolean {
+  try {
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        void sheet.cssRules;
+      } catch {
+        return true;
+      }
+    }
+  } catch {
+    return true;
+  }
+  return false;
+}
+
 export const renderElementToDataUrl = async (
   element: HTMLElement,
   pixelRatio: number = 3,
   backgroundColor: string | null = '#ffffff'
 ): Promise<string> => {
+  const skipFonts = hasRestrictedStylesheet();
   const options = {
     pixelRatio,
     cacheBust: true,
     backgroundColor: backgroundColor || undefined,
+    skipFonts,
     filter: (node: Node) => {
       if (node instanceof HTMLElement && node.classList.contains('no-print')) {
         return false;

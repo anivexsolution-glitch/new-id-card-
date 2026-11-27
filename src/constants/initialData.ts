@@ -23,8 +23,6 @@ export const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
     widthMm: 53.98,
     heightMm: 85.6,
   },
-  adminUsername: 'admin',
-  adminPassword: 'admin123',
   customBrandColors: {
     enabled: false,
     primary: '#be123c',

@@ -1,0 +1,359 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Default-deny catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared hardened primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function hasParentUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function hasOrCreatesParentUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) ||
+        existsAfter(/databases/$(database)/documents/users/$(userId));
+    }
+
+    // Validation blueprint: UserProfile
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && isValidId(data.uid)
+        && data.email is string
+        && data.email.size() <= 254
+        && data.displayName is string
+        && data.displayName.size() <= 120
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1024))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation blueprint: SchoolSettingsDoc
+    function isValidSchoolSettings(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'schoolName', 'tagline', 'schoolCode', 'address',
+          'contactNumber', 'email', 'website', 'academicSession',
+          'logoUrl', 'principalSignatureUrl', 'principalName',
+          'defaultTemplateId', 'defaultOrientation', 'cardDimensions',
+          'visibleFields', 'isDemoMode', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'schoolName', 'tagline', 'schoolCode', 'address',
+          'contactNumber', 'email', 'website', 'academicSession',
+          'logoUrl', 'principalSignatureUrl', 'principalName',
+          'defaultTemplateId', 'defaultOrientation', 'defaultCustomization',
+          'cardDimensions', 'customBrandColors', 'visibleFields',
+          'isDemoMode', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.ownerId)
+        && data.schoolName is string && data.schoolName.size() >= 1 && data.schoolName.size() <= 180
+        && data.tagline is string && data.tagline.size() <= 240
+        && data.schoolCode is string && data.schoolCode.size() <= 80
+        && data.address is string && data.address.size() <= 320
+        && data.contactNumber is string && data.contactNumber.size() <= 80
+        && data.email is string && data.email.size() <= 254
+        && data.website is string && data.website.size() <= 254
+        && data.academicSession is string && data.academicSession.size() <= 40
+        && data.logoUrl is string && data.logoUrl.size() <= 260000
+        && data.principalSignatureUrl is string && data.principalSignatureUrl.size() <= 260000
+        && data.principalName is string && data.principalName.size() <= 120
+        && data.defaultTemplateId is string && data.defaultTemplateId.size() >= 1 && data.defaultTemplateId.size() <= 64
+        && data.defaultOrientation in ['landscape', 'portrait']
+        && data.cardDimensions is map
+        && data.cardDimensions.keys().hasAll(['widthMm', 'heightMm'])
+        && data.cardDimensions.keys().hasOnly(['widthMm', 'heightMm'])
+        && data.cardDimensions.widthMm is number
+        && data.cardDimensions.heightMm is number
+        && (!('customBrandColors' in data) || (
+          data.customBrandColors is map &&
+          data.customBrandColors.keys().hasAll(['enabled', 'primary', 'secondary', 'accent']) &&
+          data.customBrandColors.keys().hasOnly(['enabled', 'primary', 'secondary', 'accent']) &&
+          data.customBrandColors.enabled is bool &&
+          data.customBrandColors.primary is string && data.customBrandColors.primary.size() <= 24 &&
+          data.customBrandColors.secondary is string && data.customBrandColors.secondary.size() <= 24 &&
+          data.customBrandColors.accent is string && data.customBrandColors.accent.size() <= 24
+        ))
+        && (!('defaultCustomization' in data) || (data.defaultCustomization is map && data.defaultCustomization.keys().size() <= 30))
+        && data.visibleFields is map
+        && data.visibleFields.keys().size() <= 20
+        && data.isDemoMode is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation blueprint: StudentDoc
+    function isValidStudent(data, studentId, userId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'name', 'fatherName', 'motherName',
+          'contactNumber', 'dob', 'address', 'conveyance',
+          'session', 'clientCreatedAt', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'fatherName', 'motherName',
+          'contactNumber', 'dob', 'address', 'conveyance',
+          'session', 'rollNo', 'classGrade', 'bloodGroup',
+          'photoUrl', 'photoCrop', 'idCardNumber', 'emergencyContact',
+          'isCardGenerated', 'generatedDate', 'clientCreatedAt',
+          'createdAt', 'updatedAt'
+        ])
+        && data.id is string && isValidId(data.id) && data.id == studentId
+        && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId == userId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 140
+        && data.fatherName is string && data.fatherName.size() <= 140
+        && data.motherName is string && data.motherName.size() <= 140
+        && data.contactNumber is string && data.contactNumber.size() <= 40
+        && data.dob is string && data.dob.size() <= 32
+        && data.address is string && data.address.size() <= 320
+        && data.conveyance in ['Yes', 'No']
+        && data.session is string && data.session.size() <= 40
+        && (!('rollNo' in data) || (data.rollNo is string && data.rollNo.size() <= 40))
+        && (!('classGrade' in data) || (data.classGrade is string && data.classGrade.size() <= 60))
+        && (!('bloodGroup' in data) || (data.bloodGroup is string && data.bloodGroup.size() <= 16))
+        && (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 260000))
+        && (!('photoCrop' in data) || (
+          data.photoCrop is map &&
+          data.photoCrop.keys().hasAll(['zoom', 'x', 'y']) &&
+          data.photoCrop.keys().hasOnly(['zoom', 'x', 'y']) &&
+          data.photoCrop.zoom is number &&
+          data.photoCrop.x is number &&
+          data.photoCrop.y is number
+        ))
+        && (!('idCardNumber' in data) || (data.idCardNumber is string && data.idCardNumber.size() <= 64))
+        && (!('emergencyContact' in data) || (data.emergencyContact is string && data.emergencyContact.size() <= 40))
+        && (!('isCardGenerated' in data) || data.isCardGenerated is bool)
+        && (!('generatedDate' in data) || (data.generatedDate is string && data.generatedDate.size() <= 32))
+        && data.clientCreatedAt is string && data.clientCreatedAt.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation blueprint: CustomTemplateDoc
+    function isValidCustomTemplate(data, templateId, userId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'name', 'baseTemplateId', 'orientation',
+          'clientCreatedAt', 'clientUpdatedAt', 'customization',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'baseTemplateId', 'orientation',
+          'clientCreatedAt', 'clientUpdatedAt', 'customization',
+          'createdAt', 'updatedAt'
+        ])
+        && data.id is string && isValidId(data.id) && data.id == templateId
+        && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId == userId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.baseTemplateId is string && data.baseTemplateId.size() >= 1 && data.baseTemplateId.size() <= 64
+        && data.orientation in ['landscape', 'portrait']
+        && data.clientCreatedAt is string && data.clientCreatedAt.size() <= 64
+        && data.clientUpdatedAt is string && data.clientUpdatedAt.size() <= 64
+        && data.customization is map && data.customization.keys().size() <= 35
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation blueprint: ExportHistoryDoc
+    function isValidExportHistory(data, exportId, userId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'timestamp', 'format', 'fileName',
+          'cardCount', 'templateName', 'orientation',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'timestamp', 'format', 'fileName',
+          'cardCount', 'templateName', 'orientation',
+          'createdAt', 'updatedAt'
+        ])
+        && data.id is string && isValidId(data.id) && data.id == exportId
+        && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId == userId
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && data.format in ['A4 PDF', 'CR80 PDF', 'PNG', 'Browser Print', 'CSV']
+        && data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 180
+        && data.cardCount is int && data.cardCount >= 0 && data.cardCount <= 100000
+        && data.templateName is string && data.templateName.size() <= 120
+        && data.orientation in ['portrait', 'landscape']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // User root profile & private workspace
+    match /users/{userId} {
+      allow get: if isVerifiedOwner(userId) && isValidId(userId) && (resource == null || resource.data.uid == request.auth.uid);
+      allow list: if false;
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'updatedAt']);
+      allow delete: if false;
+
+      match /settings/{settingId} {
+        allow get: if isVerifiedOwner(userId)
+          && isValidId(settingId)
+          && settingId == 'school'
+          && (resource == null || (resource.data.ownerId == request.auth.uid && hasParentUser(userId)));
+        allow list: if isVerifiedOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(settingId)
+          && settingId == 'school'
+          && isValidSchoolSettings(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasOrCreatesParentUser(userId);
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(settingId)
+          && settingId == 'school'
+          && isValidSchoolSettings(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasParentUser(userId)
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'schoolName', 'tagline', 'schoolCode', 'address', 'contactNumber',
+            'email', 'website', 'academicSession', 'logoUrl',
+            'principalSignatureUrl', 'principalName', 'defaultTemplateId',
+            'defaultOrientation', 'defaultCustomization', 'cardDimensions',
+            'customBrandColors', 'visibleFields', 'isDemoMode', 'updatedAt'
+          ]);
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(settingId)
+          && settingId == 'school'
+          && existing().ownerId == request.auth.uid
+          && hasParentUser(userId);
+      }
+
+      match /students/{studentId} {
+        allow get: if isVerifiedOwner(userId)
+          && isValidId(studentId)
+          && (resource == null || (resource.data.ownerId == request.auth.uid && hasParentUser(userId)));
+        allow list: if isVerifiedOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(studentId)
+          && isValidStudent(incoming(), studentId, userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasOrCreatesParentUser(userId);
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(studentId)
+          && isValidStudent(incoming(), studentId, userId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasParentUser(userId)
+          && (
+            // Action 1: Profile / photo edit
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'fatherName', 'motherName', 'contactNumber', 'dob',
+              'address', 'conveyance', 'session', 'rollNo', 'classGrade',
+              'bloodGroup', 'photoUrl', 'photoCrop', 'idCardNumber',
+              'emergencyContact', 'updatedAt'
+            ]) ||
+            // Action 2: Card generation status toggle
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'isCardGenerated', 'generatedDate', 'updatedAt'
+            ]) ||
+            // Action 3: Full record update
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'fatherName', 'motherName', 'contactNumber', 'dob',
+              'address', 'conveyance', 'session', 'rollNo', 'classGrade',
+              'bloodGroup', 'photoUrl', 'photoCrop', 'idCardNumber',
+              'emergencyContact', 'isCardGenerated', 'generatedDate', 'updatedAt'
+            ])
+          );
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(studentId)
+          && existing().ownerId == request.auth.uid
+          && hasParentUser(userId);
+      }
+
+      match /customTemplates/{templateId} {
+        allow get: if isVerifiedOwner(userId)
+          && isValidId(templateId)
+          && (resource == null || (resource.data.ownerId == request.auth.uid && hasParentUser(userId)));
+        allow list: if isVerifiedOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(templateId)
+          && isValidCustomTemplate(incoming(), templateId, userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasOrCreatesParentUser(userId);
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(templateId)
+          && isValidCustomTemplate(incoming(), templateId, userId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasParentUser(userId)
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'baseTemplateId', 'orientation', 'clientUpdatedAt', 'customization', 'updatedAt'
+          ]);
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(templateId)
+          && existing().ownerId == request.auth.uid
+          && hasParentUser(userId);
+      }
+
+      match /exportHistory/{exportId} {
+        allow get: if isVerifiedOwner(userId)
+          && isValidId(exportId)
+          && (resource == null || (resource.data.ownerId == request.auth.uid && hasParentUser(userId)));
+        allow list: if isVerifiedOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(exportId)
+          && isValidExportHistory(incoming(), exportId, userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasOrCreatesParentUser(userId);
+        allow update: if false;
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(exportId)
+          && existing().ownerId == request.auth.uid
+          && hasParentUser(userId);
+      }
+    }
+  }
+}

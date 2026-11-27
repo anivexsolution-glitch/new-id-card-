@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActiveNavTab, SchoolSettings } from '../../types';
+import { ActiveNavTab, AuthenticatedUser, SchoolSettings } from '../../types';
 import {
   LayoutDashboard,
   Users,
@@ -21,6 +21,7 @@ interface SidebarProps {
   activeTab: ActiveNavTab;
   onSelectTab: (tab: ActiveNavTab) => void;
   schoolSettings: SchoolSettings;
+  currentUser: AuthenticatedUser | null;
   studentCount: number;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -34,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
   schoolSettings,
+  currentUser,
   studentCount,
   isCollapsed,
   onToggleCollapse,
@@ -202,14 +204,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           {!collapsed && (
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-[#24364B] text-white text-xs font-bold flex items-center justify-center shrink-0 uppercase">
-                {(schoolSettings.adminUsername || 'A').charAt(0)}
-              </div>
+              {currentUser?.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={currentUser.displayName || 'Account avatar'}
+                  className="w-7 h-7 rounded-lg object-cover border border-[#E3E7EB] shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-[#24364B] text-white text-xs font-bold flex items-center justify-center shrink-0 uppercase">
+                  {(currentUser?.displayName || currentUser?.email || 'U').charAt(0)}
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-[#202B38] truncate">
-                  {schoolSettings.adminUsername || 'admin'}
+                  {currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Account'}
                 </p>
-                <p className="text-[11px] text-[#75808C] truncate">Administrator</p>
+                <p className="text-[11px] text-[#75808C] truncate">
+                  {currentUser?.email || 'Cloud Synced'}
+                </p>
               </div>
             </div>
           )}

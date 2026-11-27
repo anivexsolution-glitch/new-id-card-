@@ -3,9 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { auth } from './firebase';
 import {
   ActiveNavTab,
+  AuthenticatedUser,
   ExportHistoryRecord,
   SavedCustomTemplate,
   SchoolSettings,
@@ -13,17 +16,23 @@ import {
   TemplateId,
 } from './types';
 import { DEFAULT_SCHOOL_SETTINGS, DEMO_STUDENTS } from './constants/initialData';
+import { clearLegacyLocalCaches } from './utils/idbStorage';
 import {
-  appendExportHistory,
-  clearExportHistory,
-  getExportHistory,
-  idbGetCustomTemplates,
-  idbGetSettings,
-  idbGetStudents,
-  idbSaveCustomTemplates,
-  idbSaveSettings,
-  idbSaveStudents,
-} from './utils/idbStorage';
+  appendExportHistoryCloud,
+  bulkMarkGeneratedCloud,
+  clearExportHistoryCloud,
+  deleteCustomTemplateCloud,
+  deleteStudentCloud,
+  deleteStudentsBatchCloud,
+  ensureUserWorkspace,
+  saveCustomTemplateCloud,
+  saveUserSettingsCloud,
+  subscribeUserWorkspace,
+  syncStudentsBulkCloud,
+  toggleStudentCardStatusCloud,
+  updateDemoModeCloud,
+  upsertStudentCloud,
+} from './utils/firestoreSync';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopBar } from './components/layout/TopBar';
 import { DashboardView } from './components/dashboard/DashboardView';
@@ -37,13 +46,22 @@ import { ExportHistoryView } from './components/export/ExportHistoryView';
 import { SettingsView } from './components/settings/SettingsView';
 import { LoginView } from './components/auth/LoginView';
 import { HelpSupportModal } from './components/ui/EnterpriseUI';
-import { CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveNavTab>('dashboard');
-  const [students, setStudents] = useState<Student[]>(DEMO_STUDENTS);
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(DEFAULT_SCHOOL_SETTINGS);
+
+  // Firebase Auth & Per-User Cloud Workspace State
+  const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
+  const [pendingVerificationUser, setPendingVerificationUser] = useState<AuthenticatedUser | null>(
+    null
+  );
+  const [authReady, setAuthReady] = useState<boolean>(false);
+  const [syncingWorkspace, setSyncingWorkspace] = useState<boolean>(false);
+  const [authReloadNonce, setAuthReloadNonce] = useState<number>(0);
 
   // Navigation & Shell States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -56,316 +74,464 @@ export default function App() {
     'portrait_red_magenta_curved'
   );
   const [customTemplates, setCustomTemplates] = useState<SavedCustomTemplate[]>([]);
-  const [exportHistory, setExportHistory] = useState<ExportHistoryRecord[]>(() =>
-    getExportHistory()
-  );
+  const [exportHistory, setExportHistory] = useState<ExportHistoryRecord[]>([]);
 
   // Modal states
   const [isStudentModalOpen, setIsStudentModalOpen] = useState<boolean>(false);
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
 
-  const [toastMessage, setToastMessage] = useState<string>('');
+  const [toastState, setToastState] = useState<{
+    message: string;
+    tone: 'success' | 'error';
+  } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
-  // Client-side local workstation authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      return (
-        sessionStorage.getItem('scholarcard_auth') === 'true' ||
-        localStorage.getItem('scholarcard_auth') === 'true'
-      );
-    } catch {
-      return false;
+  const triggerToast = (message: string, tone: 'success' | 'error' = 'success') => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
     }
-  });
-
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 4200);
+    setToastState({ message, tone });
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastState(null);
+      toastTimerRef.current = null;
+    }, 4500);
   };
 
-  const handleLoginSuccess = (rememberMe: boolean) => {
-    setIsAuthenticated(true);
+  const activateAuthenticatedWorkspace = async (
+    firebaseUser: User,
+    isActive: () => boolean,
+    setUnsub: (fn: () => void) => void
+  ) => {
+    const nextUser: AuthenticatedUser = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName,
+      photoURL: firebaseUser.photoURL,
+      emailVerified: firebaseUser.emailVerified,
+    };
+    setPendingVerificationUser(null);
+    setAuthUser(nextUser);
+    setAuthReady(true);
+    setSyncingWorkspace(true);
+
     try {
-      if (rememberMe) {
-        localStorage.setItem('scholarcard_auth', 'true');
-      } else {
-        sessionStorage.setItem('scholarcard_auth', 'true');
+      await ensureUserWorkspace(firebaseUser);
+      if (!isActive() || auth.currentUser?.uid !== firebaseUser.uid) return;
+
+      const unsub = subscribeUserWorkspace(firebaseUser.uid, {
+        onSettings: (settings, demoFlag) => {
+          if (!isActive()) return;
+          setSchoolSettings(settings);
+          setIsDemoMode(demoFlag);
+          setSelectedTemplateForEditor((prev) =>
+            prev === 'portrait_red_magenta_curved' && settings.defaultTemplateId
+              ? settings.defaultTemplateId
+              : prev
+          );
+        },
+        onStudents: (cloudStudents) => {
+          if (!isActive()) return;
+          setStudents(cloudStudents);
+        },
+        onTemplates: (cloudTemplates) => {
+          if (!isActive()) return;
+          setCustomTemplates(cloudTemplates);
+        },
+        onExportHistory: (cloudHistory) => {
+          if (!isActive()) return;
+          setExportHistory(cloudHistory);
+        },
+      });
+      setUnsub(unsub);
+    } catch (err) {
+      console.error('Failed to initialize isolated cloud workspace:', err);
+      if (isActive()) {
+        triggerToast('Failed to sync your cloud workspace. Please refresh and try again.', 'error');
       }
-    } catch (e) {
-      console.error(e);
+    } finally {
+      if (isActive()) {
+        setSyncingWorkspace(false);
+      }
     }
-    triggerToast('Signed in to THE ID MAKER.');
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    try {
-      sessionStorage.removeItem('scholarcard_auth');
-      localStorage.removeItem('scholarcard_auth');
-    } catch (e) {
-      console.error(e);
-    }
-    triggerToast('Signed out of local session.');
-  };
-
-  // Initialize from IndexedDB
+  // Subscribe to Firebase Auth and isolate workspace strictly per authenticated UID
   useEffect(() => {
-    async function loadInitialData() {
-      try {
-        const [loadedSettings, loadedData, loadedTemplates] = await Promise.all([
-          idbGetSettings(),
-          idbGetStudents(),
-          idbGetCustomTemplates(),
-        ]);
-        if (loadedSettings) {
-          let nextSettings = {
-            ...DEFAULT_SCHOOL_SETTINGS,
-            ...loadedSettings,
-            visibleFields: {
-              ...DEFAULT_SCHOOL_SETTINGS.visibleFields,
-              ...(loadedSettings.visibleFields || {}),
-            },
-          };
-          try {
-            let changed = false;
-            if (!localStorage.getItem('scholarcard_qr_v2_migrated')) {
-              nextSettings = {
-                ...nextSettings,
-                visibleFields: {
-                  ...nextSettings.visibleFields,
-                  barcode: true,
-                },
-              };
-              localStorage.setItem('scholarcard_qr_v2_migrated', 'true');
-              changed = true;
-            }
-            if (!localStorage.getItem('scholarcard_printscale_v3_migrated')) {
-              if (nextSettings.defaultCustomization) {
-                const dc = nextSettings.defaultCustomization;
-                nextSettings = {
-                  ...nextSettings,
-                  defaultCustomization: {
-                    ...dc,
-                    schoolNameFontSize:
-                      (dc.schoolNameFontSize ?? 0) < 29 ? 31 : dc.schoolNameFontSize,
-                    studentNameFontSize:
-                      (dc.studentNameFontSize ?? 0) < 31 ? 33 : dc.studentNameFontSize,
-                    fieldLabelFontSize:
-                      (dc.fieldLabelFontSize ?? 0) < 15 ? 16 : dc.fieldLabelFontSize,
-                    fieldValueFontSize:
-                      (dc.fieldValueFontSize ?? 0) < 19 ? 20 : dc.fieldValueFontSize,
-                    addressFontSize:
-                      (dc.addressFontSize ?? 0) < 14 ? 15 : dc.addressFontSize,
-                    logoSize: (dc.logoSize ?? 0) < 82 ? 90 : dc.logoSize,
-                  },
-                };
-                changed = true;
-              }
-              localStorage.setItem('scholarcard_printscale_v3_migrated', 'true');
-            }
-            if (changed) {
-              idbSaveSettings(nextSettings);
-            }
-          } catch {
-            // ignore storage restriction
-          }
-          setSchoolSettings(nextSettings);
-        }
-        if (loadedData && loadedData.students) {
-          setStudents(loadedData.students);
-          setIsDemoMode(loadedData.isDemo);
-        }
-        if (loadedTemplates && loadedTemplates.length > 0) {
-          setCustomTemplates(loadedTemplates);
-        }
-      } catch (err) {
-        console.error('Error initializing data from IndexedDB', err);
+    let active = true;
+    let unsubWorkspace: (() => void) | null = null;
+
+    const resetWorkspaceState = () => {
+      setStudents([]);
+      setCustomTemplates([]);
+      setExportHistory([]);
+      setSchoolSettings(DEFAULT_SCHOOL_SETTINGS);
+      setIsDemoMode(false);
+      setSelectedStudentForEditor('');
+      setSelectedTemplateForEditor('portrait_red_magenta_curved');
+      setStudentToEdit(null);
+      setIsStudentModalOpen(false);
+    };
+
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
+      // Tear down previous user's listeners & in-memory state immediately
+      if (unsubWorkspace) {
+        unsubWorkspace();
+        unsubWorkspace = null;
       }
+      resetWorkspaceState();
+      void clearLegacyLocalCaches();
+
+      if (!firebaseUser) {
+        if (!active) return;
+        setAuthUser(null);
+        setPendingVerificationUser(null);
+        setAuthReady(true);
+        setSyncingWorkspace(false);
+        return;
+      }
+
+      if (!active) return;
+
+      if (!firebaseUser.emailVerified) {
+        setAuthUser(null);
+        setPendingVerificationUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+          emailVerified: false,
+        });
+        setAuthReady(true);
+        setSyncingWorkspace(false);
+        return;
+      }
+
+      await activateAuthenticatedWorkspace(
+        firebaseUser,
+        () => active,
+        (fn) => {
+          unsubWorkspace = fn;
+        }
+      );
+    });
+
+    return () => {
+      active = false;
+      unsubAuth();
+      if (unsubWorkspace) {
+        unsubWorkspace();
+      }
+    };
+  }, [authReloadNonce]);
+
+  const handleCheckVerification = async (): Promise<boolean> => {
+    const user = auth.currentUser;
+    if (!user) return false;
+    await user.reload();
+    await user.getIdToken(true);
+    if (user.emailVerified) {
+      setAuthReloadNonce((n) => n + 1);
+      return true;
     }
-    loadInitialData();
-  }, []);
+    return false;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await clearLegacyLocalCaches();
+      await signOut(auth);
+      setActiveTab('dashboard');
+      triggerToast('Signed out securely.');
+    } catch (err) {
+      console.error('Sign out error:', err);
+      triggerToast('Could not sign out cleanly. Please refresh.', 'error');
+    }
+  };
+
+  const handleCloudError = (actionLabel: string, err: unknown) => {
+    console.error(`Cloud sync error (${actionLabel}):`, err);
+    triggerToast(`Cloud sync failed while ${actionLabel}. Please check your connection.`, 'error');
+  };
 
   const handleLogExport = (entry: Omit<ExportHistoryRecord, 'id' | 'timestamp'>) => {
-    const updated = appendExportHistory(entry);
-    setExportHistory(updated);
+    const uid = authUser?.uid;
+    if (!uid) return;
+    void appendExportHistoryCloud(uid, entry).catch((err) =>
+      handleCloudError('recording export history', err)
+    );
   };
 
   const handleClearExportHistory = () => {
-    clearExportHistory();
+    const uid = authUser?.uid;
+    if (!uid) return;
     setExportHistory([]);
-    triggerToast('Export history cleared.');
+    void clearExportHistoryCloud(uid)
+      .then(() => triggerToast('Export history cleared across your devices.'))
+      .catch((err) => handleCloudError('clearing export history', err));
   };
 
   const handleSaveCustomTemplate = (template: SavedCustomTemplate) => {
+    const uid = authUser?.uid;
+    if (!uid) return;
     setCustomTemplates((prev) => {
       const existingIndex = prev.findIndex((t) => t.id === template.id);
-      let updated: SavedCustomTemplate[];
       if (existingIndex >= 0) {
-        updated = [...prev];
-        updated[existingIndex] = template;
-      } else {
-        updated = [template, ...prev];
+        const next = [...prev];
+        next[existingIndex] = template;
+        return next;
       }
-      idbSaveCustomTemplates(updated);
-      return updated;
+      return [template, ...prev];
     });
-    triggerToast(`Saved template "${template.name}".`);
+    void saveCustomTemplateCloud(uid, template)
+      .then(() => triggerToast(`Saved template "${template.name}" to cloud.`))
+      .catch((err) => handleCloudError('saving custom template', err));
   };
 
   const handleDeleteCustomTemplate = (templateId: string) => {
-    setCustomTemplates((prev) => {
-      const updated = prev.filter((t) => t.id !== templateId);
-      idbSaveCustomTemplates(updated);
-      return updated;
-    });
-    triggerToast('Custom template deleted.');
+    const uid = authUser?.uid;
+    if (!uid) return;
+    setCustomTemplates((prev) => prev.filter((t) => t.id !== templateId));
+    void deleteCustomTemplateCloud(uid, templateId)
+      .then(() => triggerToast('Custom template deleted.'))
+      .catch((err) => handleCloudError('deleting custom template', err));
   };
 
   const handleSaveStudent = (savedStudent: Student) => {
-    setStudents((prev) => {
-      const exists = prev.some((s) => s.id === savedStudent.id);
-      let updated: Student[];
-      if (exists) {
-        updated = prev.map((s) => (s.id === savedStudent.id ? savedStudent : s));
-        triggerToast(`Updated record for ${savedStudent.name}.`);
-      } else {
-        updated = [savedStudent, ...prev];
-        triggerToast(`Added student: ${savedStudent.name}.`);
-      }
-      idbSaveStudents(updated, false);
-      setIsDemoMode(false);
-      return updated;
-    });
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const exists = students.some((s) => s.id === savedStudent.id);
+    setStudents((prev) =>
+      exists
+        ? prev.map((s) => (s.id === savedStudent.id ? savedStudent : s))
+        : [savedStudent, ...prev]
+    );
+    setIsDemoMode(false);
+    void Promise.all([
+      upsertStudentCloud(uid, savedStudent),
+      isDemoMode ? updateDemoModeCloud(uid, false) : Promise.resolve(),
+    ])
+      .then(() =>
+        triggerToast(
+          exists ? `Updated record for ${savedStudent.name}.` : `Added student: ${savedStudent.name}.`
+        )
+      )
+      .catch((err) => handleCloudError('saving student record', err));
   };
 
   const handleDeleteStudent = (studentId: string) => {
-    setStudents((prev) => {
-      const updated = prev.filter((s) => s.id !== studentId);
-      idbSaveStudents(updated, isDemoMode && updated.length > 0);
-      triggerToast('Student record removed.');
-      return updated;
-    });
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const nextCount = students.filter((s) => s.id !== studentId).length;
+    const nextDemo = isDemoMode && nextCount > 0;
+    setStudents((prev) => prev.filter((s) => s.id !== studentId));
+    setIsDemoMode(nextDemo);
+    void Promise.all([
+      deleteStudentCloud(uid, studentId),
+      nextDemo !== isDemoMode ? updateDemoModeCloud(uid, nextDemo) : Promise.resolve(),
+    ])
+      .then(() => triggerToast('Student record removed.'))
+      .catch((err) => handleCloudError('removing student record', err));
   };
 
   const handleBulkDelete = (studentIds: string[]) => {
-    setStudents((prev) => {
-      const updated = prev.filter((s) => !studentIds.includes(s.id));
-      idbSaveStudents(updated, false);
-      setIsDemoMode(false);
-      triggerToast(`Deleted ${studentIds.length} student records.`);
-      return updated;
-    });
+    const uid = authUser?.uid;
+    if (!uid) return;
+    setStudents((prev) => prev.filter((s) => !studentIds.includes(s.id)));
+    setIsDemoMode(false);
+    void Promise.all([
+      deleteStudentsBatchCloud(uid, studentIds),
+      isDemoMode ? updateDemoModeCloud(uid, false) : Promise.resolve(),
+    ])
+      .then(() => triggerToast(`Deleted ${studentIds.length} student records.`))
+      .catch((err) => handleCloudError('deleting selected students', err));
   };
 
   const handleToggleCardGenerated = (studentId: string) => {
-    setStudents((prev) => {
-      const updated = prev.map((s) =>
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const target = students.find((s) => s.id === studentId);
+    if (!target) return;
+    const nextStatus = !target.isCardGenerated;
+    const nextDate = nextStatus ? new Date().toISOString().split('T')[0] : undefined;
+
+    setStudents((prev) =>
+      prev.map((s) =>
         s.id === studentId
           ? {
               ...s,
-              isCardGenerated: !s.isCardGenerated,
-              generatedDate: !s.isCardGenerated ? new Date().toISOString().split('T')[0] : undefined,
+              isCardGenerated: nextStatus,
+              generatedDate: nextDate,
             }
           : s
-      );
-      idbSaveStudents(updated, isDemoMode);
-      return updated;
-    });
+      )
+    );
+    void toggleStudentCardStatusCloud(uid, studentId, nextStatus, nextDate).catch((err) =>
+      handleCloudError('updating card status', err)
+    );
   };
 
   const handleBulkGenerate = (studentIds: string[]) => {
-    setStudents((prev) => {
-      const updated = prev.map((s) =>
+    const uid = authUser?.uid;
+    if (!uid || studentIds.length === 0) return;
+    const today = new Date().toISOString().split('T')[0];
+    setStudents((prev) =>
+      prev.map((s) =>
         studentIds.includes(s.id)
           ? {
               ...s,
               isCardGenerated: true,
-              generatedDate: new Date().toISOString().split('T')[0],
+              generatedDate: today,
             }
           : s
-      );
-      idbSaveStudents(updated, isDemoMode);
-      return updated;
-    });
-    triggerToast(`Marked ${studentIds.length} ID cards as generated.`);
+      )
+    );
+    void bulkMarkGeneratedCloud(uid, studentIds, today)
+      .then(() => triggerToast(`Marked ${studentIds.length} ID cards as generated.`))
+      .catch((err) => handleCloudError('updating batch generation status', err));
   };
 
   const handleImportComplete = (importedStudents: Student[], mode: 'append' | 'replace') => {
-    setStudents((prev) => {
-      const updated = mode === 'replace' ? importedStudents : [...importedStudents, ...prev];
-      idbSaveStudents(updated, false);
-      setIsDemoMode(false);
-      return updated;
-    });
-    triggerToast(`Imported ${importedStudents.length} student records.`);
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const existingIds = mode === 'replace' ? students.map((s) => s.id) : [];
+    setStudents((prev) =>
+      mode === 'replace' ? importedStudents : [...importedStudents, ...prev]
+    );
+    setIsDemoMode(false);
+    void Promise.all([
+      syncStudentsBulkCloud(uid, importedStudents, mode, existingIds),
+      updateDemoModeCloud(uid, false),
+    ])
+      .then(() => triggerToast(`Synced ${importedStudents.length} imported student records to cloud.`))
+      .catch((err) => handleCloudError('importing students', err));
   };
 
   const handleSaveSettings = (newSettings: SchoolSettings) => {
+    const uid = authUser?.uid;
+    if (!uid) return;
     setSchoolSettings(newSettings);
-    idbSaveSettings(newSettings);
-    triggerToast('School settings saved.');
+    void saveUserSettingsCloud(uid, newSettings, isDemoMode)
+      .then(() => triggerToast('School settings synced across devices.'))
+      .catch((err) => handleCloudError('saving school settings', err));
   };
 
   const handleRestoreData = (restoredSettings: SchoolSettings, restoredStudents: Student[]) => {
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const existingIds = students.map((s) => s.id);
     setStudents(restoredStudents);
     setSchoolSettings(restoredSettings);
-    idbSaveStudents(restoredStudents, false);
-    idbSaveSettings(restoredSettings);
     setIsDemoMode(false);
-    triggerToast('Backup restored.');
+    void Promise.all([
+      syncStudentsBulkCloud(uid, restoredStudents, 'replace', existingIds),
+      saveUserSettingsCloud(uid, restoredSettings, false),
+    ])
+      .then(() => triggerToast('Backup restored and synced to your cloud workspace.'))
+      .catch((err) => handleCloudError('restoring backup', err));
   };
 
   const handleResetToDemo = () => {
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const existingIds = students.map((s) => s.id);
     setStudents(DEMO_STUDENTS);
     setSchoolSettings(DEFAULT_SCHOOL_SETTINGS);
-    idbSaveStudents(DEMO_STUDENTS, true);
-    idbSaveSettings(DEFAULT_SCHOOL_SETTINGS);
     setIsDemoMode(true);
-    triggerToast('Reset to demonstration roster.');
+    void Promise.all([
+      syncStudentsBulkCloud(uid, DEMO_STUDENTS, 'replace', existingIds),
+      saveUserSettingsCloud(uid, DEFAULT_SCHOOL_SETTINGS, true),
+    ])
+      .then(() => triggerToast('Reset to demonstration roster.'))
+      .catch((err) => handleCloudError('resetting demo roster', err));
   };
 
   const handleClearDemoData = () => {
+    const uid = authUser?.uid;
+    if (!uid) return;
     if (confirm('Clear all sample student records and start with an empty roster?')) {
+      const existingIds = students.map((s) => s.id);
       setStudents([]);
-      idbSaveStudents([], false);
       setIsDemoMode(false);
-      triggerToast('Cleared student roster.');
+      void Promise.all([
+        deleteStudentsBatchCloud(uid, existingIds),
+        updateDemoModeCloud(uid, false),
+      ])
+        .then(() => triggerToast('Cleared student roster.'))
+        .catch((err) => handleCloudError('clearing student roster', err));
     }
   };
 
   const handleUpdateStudentPhoto = (studentId: string, photoUrl: string) => {
-    setStudents((prev) => {
-      const updated = prev.map((s) => (s.id === studentId ? { ...s, photoUrl } : s));
-      idbSaveStudents(updated, false);
-      setIsDemoMode(false);
-      return updated;
-    });
-    triggerToast('Student portrait updated.');
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const target = students.find((s) => s.id === studentId);
+    if (!target) return;
+    const updatedStudent = { ...target, photoUrl };
+    setStudents((prev) => prev.map((s) => (s.id === studentId ? updatedStudent : s)));
+    setIsDemoMode(false);
+    void Promise.all([
+      upsertStudentCloud(uid, updatedStudent),
+      isDemoMode ? updateDemoModeCloud(uid, false) : Promise.resolve(),
+    ])
+      .then(() => triggerToast('Student portrait synced.'))
+      .catch((err) => handleCloudError('updating student photo', err));
   };
 
   const handleUpdateStudentPhotoCrop = (
     studentId: string,
     crop: { zoom: number; x: number; y: number }
   ) => {
-    setStudents((prev) => {
-      const updated = prev.map((s) => (s.id === studentId ? { ...s, photoCrop: crop } : s));
-      idbSaveStudents(updated, isDemoMode);
-      return updated;
-    });
-  };
-
-  const handleUpdateStudentsBulk = (updatedStudents: Student[]) => {
-    setStudents(updatedStudents);
-    idbSaveStudents(updatedStudents, false);
-    setIsDemoMode(false);
-    triggerToast(
-      `Attached portraits for ${updatedStudents.filter((s) => s.photoUrl).length} students.`
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const target = students.find((s) => s.id === studentId);
+    if (!target) return;
+    const updatedStudent = { ...target, photoCrop: crop };
+    setStudents((prev) => prev.map((s) => (s.id === studentId ? updatedStudent : s)));
+    void upsertStudentCloud(uid, updatedStudent).catch((err) =>
+      handleCloudError('updating portrait crop', err)
     );
   };
 
-  if (!isAuthenticated) {
+  const handleUpdateStudentsBulk = (updatedStudents: Student[]) => {
+    const uid = authUser?.uid;
+    if (!uid) return;
+    setStudents(updatedStudents);
+    setIsDemoMode(false);
+    void Promise.all([
+      syncStudentsBulkCloud(uid, updatedStudents, 'append'),
+      updateDemoModeCloud(uid, false),
+    ])
+      .then(() =>
+        triggerToast(
+          `Synced portraits for ${updatedStudents.filter((s) => s.photoUrl).length} students.`
+        )
+      )
+      .catch((err) => handleCloudError('syncing bulk portraits', err));
+  };
+
+  if (!authReady || syncingWorkspace) {
     return (
-      <LoginView schoolSettings={schoolSettings} onLoginSuccess={handleLoginSuccess} />
+      <div className="min-h-screen bg-[#F5F6F7] flex flex-col items-center justify-center p-6 text-[#202B38]">
+        <div className="bg-white border border-[#E3E7EB] rounded-[12px] shadow-sm px-8 py-6 flex flex-col items-center gap-3 max-w-sm text-center">
+          <Loader2 className="w-7 h-7 text-[#24364B] animate-spin" />
+          <p className="text-sm font-bold text-[#202B38]">
+            {authReady ? 'Syncing your private workspace...' : 'Checking authentication...'}
+          </p>
+          <p className="text-xs text-[#75808C]">
+            Loading school settings, student roster, and templates from Firebase Cloud.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <LoginView
+        schoolSettings={schoolSettings}
+        pendingVerificationUser={pendingVerificationUser}
+        onCheckVerification={handleCheckVerification}
+      />
     );
   }
 
@@ -375,6 +541,7 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         schoolSettings={schoolSettings}
+        currentUser={authUser}
         studentCount={students.length}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((v) => !v)}
@@ -399,14 +566,19 @@ export default function App() {
           }}
           students={students}
           schoolSettings={schoolSettings}
+          currentUser={authUser}
           isDemoMode={isDemoMode}
           onLogout={handleLogout}
         />
 
-        {toastMessage && (
+        {toastState && (
           <div className="no-print fixed bottom-5 right-5 z-50 bg-[#202B38] text-white text-xs px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 border border-[#E3E7EB]/20">
-            <CheckCircle2 className="w-4 h-4 text-[#25845A] shrink-0" />
-            <span>{toastMessage}</span>
+            {toastState.tone === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-[#C44949] shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-[#25845A] shrink-0" />
+            )}
+            <span>{toastState.message}</span>
           </div>
         )}
 
@@ -415,6 +587,7 @@ export default function App() {
             <DashboardView
               students={students}
               schoolSettings={schoolSettings}
+              currentUser={authUser}
               savedCustomTemplates={customTemplates}
               exportHistory={exportHistory}
               isDemoMode={isDemoMode}
@@ -531,9 +704,11 @@ export default function App() {
             <SettingsView
               settings={schoolSettings}
               students={students}
+              currentUser={authUser}
               onSaveSettings={handleSaveSettings}
               onRestoreData={handleRestoreData}
               onResetToDemo={handleResetToDemo}
+              onLogout={handleLogout}
             />
           )}
         </main>

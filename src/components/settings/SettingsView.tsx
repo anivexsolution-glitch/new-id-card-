@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SchoolSettings, Student } from '../../types';
+import { AuthenticatedUser, SchoolSettings, Student } from '../../types';
 import { DEFAULT_SCHOOL_SETTINGS, TEMPLATE_REGISTRY } from '../../constants/initialData';
 import { CardSurface, PageHeader } from '../ui/EnterpriseUI';
 import {
@@ -15,32 +15,34 @@ import {
   Download,
   CheckCircle2,
   FileCheck,
-  Lock,
-  ShieldAlert,
-  Eye,
-  EyeOff,
   Ruler,
+  Cloud,
+  LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: SchoolSettings;
   students: Student[];
+  currentUser?: AuthenticatedUser | null;
   onSaveSettings: (newSettings: SchoolSettings) => void;
   onRestoreData: (restoredSettings: SchoolSettings, restoredStudents: Student[]) => void;
   onResetToDemo: () => void;
+  onLogout?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   students,
+  currentUser,
   onSaveSettings,
   onRestoreData,
   onResetToDemo,
+  onLogout,
 }) => {
   const [formData, setFormData] = useState<SchoolSettings>(settings);
   const [savedNotification, setSavedNotification] = useState<boolean>(false);
   const [errorNotification, setErrorNotification] = useState<string>('');
-  const [showAdminPassword, setShowAdminPassword] = useState<boolean>(false);
 
   useEffect(() => {
     setFormData(settings);
@@ -192,7 +194,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <PageHeader
         title="Settings"
-        subtitle="Configure school details, institutional branding, CR80 card defaults, visibility preferences, local backups, and workstation login."
+        subtitle="Configure school details, institutional branding, CR80 card defaults, visibility preferences, JSON backups, and your connected cloud account."
         actions={
           <button
             type="button"
@@ -209,7 +211,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="p-3.5 rounded-lg bg-[#25845A]/10 border border-[#25845A]/30 flex items-center gap-2 text-xs text-[#25845A]">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span className="font-semibold">
-            Settings saved locally. Card previews and print sheets updated.
+            Settings saved to your private cloud workspace. Card previews and print sheets updated across devices.
           </span>
         </div>
       )}
@@ -755,7 +757,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-[10px] bg-[#F5F6F7] border border-[#E3E7EB] text-xs">
             <div>
               <p className="font-bold text-[#202B38] tabular-nums">
-                Local IndexedDB Archive · {students.length} students stored
+                Cloud Workspace Archive (Firebase Firestore) · {students.length} students synced
               </p>
               <p className="text-[#75808C] mt-0.5">
                 Export or restore a complete JSON backup of school settings and enrolled students.
@@ -805,54 +807,58 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* 7. ACCOUNT SETTINGS */}
         <CardSurface padding="lg" className="space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-[#E3E7EB]">
-            <Lock className="w-4 h-4 text-[#24364B]" />
-            <h3 className="text-sm font-bold text-[#202B38]">7. Account Settings</h3>
+            <ShieldCheck className="w-4 h-4 text-[#25845A]" />
+            <h3 className="text-sm font-bold text-[#202B38]">7. Connected Account &amp; Multi-Device Sync</h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-[#202B38] mb-1">
-                Local Administrator Username
-              </label>
-              <input
-                type="text"
-                value={formData.adminUsername || 'admin'}
-                onChange={(e) => setFormData({ ...formData, adminUsername: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B]"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-[#202B38] mb-1">
-                Local Administrator Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showAdminPassword ? 'text' : 'password'}
-                  value={formData.adminPassword || 'admin123'}
-                  onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-9 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] font-mono"
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-[10px] bg-[#F5F6F7] border border-[#E3E7EB] text-xs">
+            <div className="flex items-center gap-3 min-w-0">
+              {currentUser?.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={currentUser.displayName || 'Account avatar'}
+                  className="w-10 h-10 rounded-lg object-cover border border-[#E3E7EB] shrink-0"
+                  referrerPolicy="no-referrer"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowAdminPassword((v) => !v)}
-                  aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#75808C] hover:text-[#202B38]"
-                >
-                  {showAdminPassword ? (
-                    <EyeOff className="w-3.5 h-3.5" />
-                  ) : (
-                    <Eye className="w-3.5 h-3.5" />
-                  )}
-                </button>
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-[#24364B] text-white text-sm font-bold flex items-center justify-center shrink-0 uppercase">
+                  {(currentUser?.displayName || currentUser?.email || 'U').charAt(0)}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="font-bold text-[#202B38] truncate">
+                  {currentUser?.displayName || 'Google Account'}
+                </p>
+                <p className="text-[#75808C] truncate">
+                  {currentUser?.email || 'Verified Workspace'}
+                </p>
               </div>
             </div>
+
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#25845A]/10 text-[#25845A] font-semibold">
+                <Cloud className="w-3.5 h-3.5" />
+                <span>Private Cloud Sync Active</span>
+              </span>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 font-semibold text-[#C44949] bg-white border border-[#E3E7EB] hover:bg-[#F0F2F4] rounded-lg"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="p-3.5 rounded-lg border border-[#E3E7EB] bg-[#F5F6F7] flex items-start gap-2.5 text-xs">
-            <ShieldAlert className="w-4 h-4 text-[#C18A38] shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-lg border border-[#E3E7EB] bg-white flex items-start gap-2.5 text-xs">
+            <ShieldCheck className="w-4 h-4 text-[#25845A] shrink-0 mt-0.5" />
             <p className="text-[#536477] leading-relaxed">
-              <strong className="text-[#202B38]">Security Limitation Notice:</strong> Credentials are stored and verified strictly on the client side in browser IndexedDB/storage. This provides single-workstation access convenience only and is not secure against browser inspection. Implement server-side authentication and authorization before multi-user production deployment.
+              Your workspace is strictly isolated to your Google account ID (
+              <span className="font-mono text-[#202B38]">{currentUser?.uid || '—'}</span>
+              ). Other users cannot view or sync your school records, and signing in with this same Google account on another device automatically keeps your students, settings, and templates synchronized.
             </p>
           </div>
         </CardSurface>

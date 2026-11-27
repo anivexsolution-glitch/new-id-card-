@@ -49,8 +49,6 @@ export interface SchoolSettings {
     secondary: string;
     accent: string;
   };
-  adminUsername?: string;
-  adminPassword?: string;
   visibleFields: {
     fatherName: boolean;
     motherName: boolean;
@@ -218,4 +216,12 @@ export interface ExportHistoryRecord {
   cardCount: number;
   templateName: string;
   orientation: 'portrait' | 'landscape';
+}
+
+export interface AuthenticatedUser {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  emailVerified?: boolean;
 }

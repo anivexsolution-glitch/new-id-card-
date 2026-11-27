@@ -1,0 +1,437 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated Google user profile root document acting as the ownership anchor for all subcollections.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication UID matching the document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email address.",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Google display name.",
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Optional avatar URL.",
+          "maxLength": 1024
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["uid", "email", "displayName", "createdAt", "updatedAt"]
+    },
+    "SchoolSettingsDoc": {
+      "title": "SchoolSettingsDoc",
+      "description": "Per-user institutional branding, CR80 card defaults, and field visibility settings.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "schoolName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "tagline": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "schoolCode": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "contactNumber": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "website": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "academicSession": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "logoUrl": {
+          "type": "string",
+          "maxLength": 260000
+        },
+        "principalSignatureUrl": {
+          "type": "string",
+          "maxLength": 260000
+        },
+        "principalName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "defaultTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "defaultOrientation": {
+          "type": "string",
+          "enum": ["landscape", "portrait"],
+          "maxLength": 16
+        },
+        "defaultCustomization": {
+          "type": "object",
+          "description": "Optional default card styling overrides."
+        },
+        "cardDimensions": {
+          "type": "object",
+          "description": "Physical card dimensions in mm."
+        },
+        "customBrandColors": {
+          "type": "object",
+          "description": "Optional brand color override palette."
+        },
+        "visibleFields": {
+          "type": "object",
+          "description": "Global card field visibility flags."
+        },
+        "isDemoMode": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "schoolName",
+        "tagline",
+        "schoolCode",
+        "address",
+        "contactNumber",
+        "email",
+        "website",
+        "academicSession",
+        "logoUrl",
+        "principalSignatureUrl",
+        "principalName",
+        "defaultTemplateId",
+        "defaultOrientation",
+        "cardDimensions",
+        "visibleFields",
+        "isDemoMode",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudentDoc": {
+      "title": "StudentDoc",
+      "description": "Individual student identity record owned by a single user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "fatherName": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "motherName": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "contactNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "dob": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "conveyance": {
+          "type": "string",
+          "enum": ["Yes", "No"],
+          "maxLength": 8
+        },
+        "session": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "rollNo": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "classGrade": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "bloodGroup": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 260000
+        },
+        "photoCrop": {
+          "type": "object"
+        },
+        "idCardNumber": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "emergencyContact": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "isCardGenerated": {
+          "type": "boolean"
+        },
+        "generatedDate": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "clientCreatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "name",
+        "fatherName",
+        "motherName",
+        "contactNumber",
+        "dob",
+        "address",
+        "conveyance",
+        "session",
+        "clientCreatedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CustomTemplateDoc": {
+      "title": "CustomTemplateDoc",
+      "description": "User-saved custom ID card template design configuration.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "baseTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "orientation": {
+          "type": "string",
+          "enum": ["landscape", "portrait"],
+          "maxLength": 16
+        },
+        "clientCreatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "clientUpdatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "customization": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "name",
+        "baseTemplateId",
+        "orientation",
+        "clientCreatedAt",
+        "clientUpdatedAt",
+        "customization",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ExportHistoryDoc": {
+      "title": "ExportHistoryDoc",
+      "description": "Audit log record for PDF, PNG, CSV, or print exports owned by the user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "timestamp": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "format": {
+          "type": "string",
+          "enum": ["A4 PDF", "CR80 PDF", "PNG", "Browser Print", "CSV"],
+          "maxLength": 24
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "cardCount": {
+          "type": "integer"
+        },
+        "templateName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "orientation": {
+          "type": "string",
+          "enum": ["portrait", "landscape"],
+          "maxLength": 16
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "timestamp",
+        "format",
+        "fileName",
+        "cardCount",
+        "templateName",
+        "orientation",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Private root document for each authenticated Google user."
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": {
+        "$ref": "#/entities/SchoolSettingsDoc"
+      },
+      "description": "Private school branding, template defaults, and visibility preferences for the owning user."
+    },
+    "/users/{userId}/students/{studentId}": {
+      "schema": {
+        "$ref": "#/entities/StudentDoc"
+      },
+      "description": "Private student identity roster scoped strictly to the owning user."
+    },
+    "/users/{userId}/customTemplates/{templateId}": {
+      "schema": {
+        "$ref": "#/entities/CustomTemplateDoc"
+      },
+      "description": "Private saved ID card templates owned by the user."
+    },
+    "/users/{userId}/exportHistory/{exportId}": {
+      "schema": {
+        "$ref": "#/entities/ExportHistoryDoc"
+      },
+      "description": "Private export history records owned by the user."
+    }
+  }
+}

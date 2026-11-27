@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ActiveNavTab, SchoolSettings, Student } from '../../types';
+import { ActiveNavTab, AuthenticatedUser, SchoolSettings, Student } from '../../types';
 import {
   Menu,
   Search,
@@ -24,6 +24,7 @@ interface TopBarProps {
   onSelectStudentForEditor: (studentId: string) => void;
   students: Student[];
   schoolSettings: SchoolSettings;
+  currentUser: AuthenticatedUser | null;
   isDemoMode: boolean;
   onLogout: () => void;
 }
@@ -36,6 +37,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onSelectStudentForEditor,
   students,
   schoolSettings,
+  currentUser,
   isDemoMode,
   onLogout,
 }) => {
@@ -277,21 +279,32 @@ export const TopBar: React.FC<TopBarProps> = ({
             aria-label="User Profile Menu"
             className="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-[#E3E7EB] bg-white hover:bg-[#F5F6F7] transition-colors"
           >
-            <div className="w-6 h-6 rounded-md bg-[#24364B] text-white text-[11px] font-bold flex items-center justify-center uppercase">
-              {(schoolSettings.adminUsername || 'A').charAt(0)}
-            </div>
-            <span className="hidden xl:inline text-xs font-semibold text-[#202B38] max-w-[100px] truncate">
-              {schoolSettings.adminUsername || 'admin'}
+            {currentUser?.photoURL ? (
+              <img
+                src={currentUser.photoURL}
+                alt={currentUser.displayName || 'User'}
+                className="w-6 h-6 rounded-md object-cover border border-[#E3E7EB]"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-md bg-[#24364B] text-white text-[11px] font-bold flex items-center justify-center uppercase">
+                {(currentUser?.displayName || currentUser?.email || 'U').charAt(0)}
+              </div>
+            )}
+            <span className="hidden xl:inline text-xs font-semibold text-[#202B38] max-w-[130px] truncate">
+              {currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Account'}
             </span>
           </button>
 
           {showProfileMenu && (
-            <div className="absolute right-0 mt-1.5 w-56 bg-white border border-[#E3E7EB] rounded-[10px] shadow-lg py-1.5 z-40">
+            <div className="absolute right-0 mt-1.5 w-60 bg-white border border-[#E3E7EB] rounded-[10px] shadow-lg py-1.5 z-40">
               <div className="px-3.5 py-2 border-b border-[#E3E7EB]">
                 <p className="text-xs font-semibold text-[#202B38] truncate">
-                  {schoolSettings.adminUsername || 'admin'}
+                  {currentUser?.displayName || 'Signed-in User'}
                 </p>
-                <p className="text-[11px] text-[#75808C] truncate">{schoolSettings.schoolName}</p>
+                <p className="text-[11px] text-[#75808C] truncate">
+                  {currentUser?.email || schoolSettings.schoolName}
+                </p>
               </div>
               <button
                 type="button"

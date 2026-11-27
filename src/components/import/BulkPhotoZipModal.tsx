@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { Student } from '../../types';
+import { StatusText } from '../ui/EnterpriseUI';
 import {
   X,
   UploadCloud,
   FileArchive,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
-  ArrowRight,
-  Image as ImageIcon,
-  Search,
 } from 'lucide-react';
 
 interface BulkPhotoZipModalProps {
@@ -46,19 +43,18 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
 
   if (!isOpen) return null;
 
-  const normalizeStr = (str: string) => {
-    return str
+  const normalizeStr = (str: string) =>
+    str
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '')
       .trim();
-  };
 
   const handleZipFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.name.toLowerCase().endsWith('.zip')) {
-      setErrorMsg('Please select a valid .zip file archive containing student photos.');
+      setErrorMsg('Please select a valid .zip archive containing student photos.');
       return;
     }
 
@@ -78,18 +74,15 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
       const zip = new JSZip();
       const loadedZip = await zip.loadAsync(file);
 
-      // Find all image files
       const imageEntries: { name: string; entry: JSZip.JSZipObject }[] = [];
       const validExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
 
       loadedZip.forEach((relativePath, entry) => {
         if (entry.dir) return;
-        // Ignore macOS hidden files like __MACOSX/ or .DS_Store
         if (relativePath.includes('__MACOSX') || relativePath.startsWith('.')) return;
 
         const lowerName = relativePath.toLowerCase();
         if (validExtensions.some((ext) => lowerName.endsWith(ext))) {
-          // Extract base filename without folder path
           const filename = relativePath.split('/').pop() || relativePath;
           imageEntries.push({ name: filename, entry });
         }
@@ -101,22 +94,19 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
         return;
       }
 
-      setProgressText(`Matching ${imageEntries.length} photos against ${students.length} student records...`);
+      setProgressText(`Matching ${imageEntries.length} photos against ${students.length} records...`);
 
       const matches: MatchResult[] = [];
       const unmatched: string[] = [];
 
-      // Extract image data and match
       for (let i = 0; i < imageEntries.length; i++) {
         const { name: filename, entry } = imageEntries[i];
         const ext = filename.split('.').pop()?.toLowerCase() || 'jpeg';
         const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-        
-        // Base name without extension
+
         const baseName = filename.substring(0, filename.lastIndexOf('.')).trim();
         const normBaseName = normalizeStr(baseName);
 
-        // Find matching student
         let matchedStudent: Student | undefined;
 
         if (criteria === 'rollNo') {
@@ -132,7 +122,6 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
             (s) => normalizeStr(s.name) === normBaseName || normBaseName.includes(normalizeStr(s.name))
           );
         } else {
-          // SMART MATCH: Try ID, then Roll Number, then Name
           matchedStudent = students.find(
             (s) =>
               (s.idCardNumber && normalizeStr(s.idCardNumber) === normBaseName) ||
@@ -176,7 +165,7 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
       setUnmatchedFiles(unmatched);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Failed to read or extract the ZIP file: ' + (err.message || 'Corrupted archive.'));
+      setErrorMsg('Failed to extract ZIP archive: ' + (err.message || 'Corrupted archive.'));
     } finally {
       setIsProcessing(false);
       setProgressText('');
@@ -186,67 +175,65 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
   const handleApply = () => {
     if (matchedResults.length === 0) return;
 
-    // Create lookup map
     const photoMap = new Map<string, string>();
     matchedResults.forEach((m) => {
       photoMap.set(m.studentId, m.photoDataUrl);
     });
 
-    const updated = students.map((s) => {
-      if (photoMap.has(s.id)) {
-        return {
-          ...s,
-          photoUrl: photoMap.get(s.id)!,
-        };
-      }
-      return s;
-    });
+    const updated = students.map((s) =>
+      photoMap.has(s.id) ? { ...s, photoUrl: photoMap.get(s.id)! } : s
+    );
 
     onApplyPhotos(updated);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+    <div
+      className="no-print fixed inset-0 z-50 bg-[#202B38]/45 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="bg-white rounded-[12px] shadow-xl border border-[#E3E7EB] w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-[#E3E7EB] flex items-center justify-between bg-[#F5F6F7]">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
-              <FileArchive className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-[#24364B] text-white flex items-center justify-center">
+              <FileArchive className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                Bulk Student Photo ZIP Matcher
+              <h3 className="text-sm font-bold text-[#202B38]">
+                Bulk Student Photo Upload (ZIP)
               </h3>
-              <p className="text-xs text-slate-500">
-                Upload a .zip file to automatically attach photographs to student ID cards in bulk.
+              <p className="text-xs text-[#75808C]">
+                Match and attach student portraits automatically from a ZIP archive.
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors"
+            className="p-1.5 rounded-lg text-[#75808C] hover:text-[#202B38] hover:bg-[#E3E7EB]/60"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {errorMsg && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2.5 text-xs text-red-800">
-              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <div className="p-3 rounded-lg bg-[#C44949]/10 border border-[#C44949]/30 flex items-center gap-2 text-xs text-[#C44949]">
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Upload & Criteria Zone */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Criteria Selector */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700">
-                Filename Matching Strategy
+              <label className="block text-xs font-semibold text-[#202B38]">
+                Matching Strategy
               </label>
               <select
                 value={matchCriteria}
@@ -257,31 +244,32 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
                     processZipArchive(zipFile, newCriteria);
                   }
                 }}
-                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] bg-white text-[#202B38] focus:outline-none focus:border-[#24364B]"
               >
-                <option value="smart">Auto Smart Match (ID → Roll → Name)</option>
-                <option value="rollNo">Match by Roll Number (e.g. 101.jpg)</option>
-                <option value="idCardNumber">Match by Student ID / Adm No (STD-01.jpg)</option>
-                <option value="name">Match by Student Name (Aarav_Sharma.jpg)</option>
+                <option value="smart">Auto Match (ID → Roll → Name)</option>
+                <option value="rollNo">Roll Number (101.jpg)</option>
+                <option value="idCardNumber">Student ID (SCH-01.jpg)</option>
+                <option value="name">Student Name (Aarav_Sharma.jpg)</option>
               </select>
-              <p className="text-[11px] text-slate-400 leading-tight">
-                Photos inside folders or subdirectories will be extracted automatically.
+              <p className="text-[11px] text-[#75808C]">
+                Images inside subfolders are scanned automatically.
               </p>
             </div>
 
-            {/* ZIP File Picker Dropzone */}
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Upload Photo ZIP Archive
+              <label className="block text-xs font-semibold text-[#202B38] mb-1.5">
+                ZIP Archive File
               </label>
-              <label className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/60 hover:bg-blue-50/30 rounded-xl p-4 flex items-center justify-center gap-3 cursor-pointer transition-colors">
-                <UploadCloud className="w-6 h-6 text-blue-600 shrink-0" />
+              <label className="border border-dashed border-[#E3E7EB] hover:border-[#24364B] bg-[#F5F6F7] hover:bg-[#F0F2F4] rounded-[10px] p-4 flex items-center justify-center gap-3 cursor-pointer transition-colors">
+                <UploadCloud className="w-5 h-5 text-[#24364B] shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-slate-800 truncate">
-                    {zipFile ? zipFile.name : 'Select or drag & drop student_photos.zip'}
+                  <p className="text-xs font-semibold text-[#202B38] truncate">
+                    {zipFile ? zipFile.name : 'Select student_photos.zip'}
                   </p>
-                  <p className="text-[11px] text-slate-400">
-                    {zipFile ? `${(zipFile.size / (1024 * 1024)).toFixed(2)} MB archive` : 'Supports JPG, PNG, WEBP images inside ZIP'}
+                  <p className="text-[11px] text-[#75808C]">
+                    {zipFile
+                      ? `${(zipFile.size / (1024 * 1024)).toFixed(2)} MB`
+                      : 'Supports JPG, PNG, and WebP portraits'}
                   </p>
                 </div>
                 <input
@@ -294,67 +282,62 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
             </div>
           </div>
 
-          {/* Processing State */}
           {isProcessing && (
-            <div className="p-8 text-center bg-blue-50/50 rounded-xl border border-blue-200">
-              <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-xs font-bold text-blue-900">{progressText}</p>
-              <p className="text-[11px] text-blue-700/80 mt-1">Extracting and optimizing images in browser memory...</p>
+            <div className="p-6 text-center bg-[#F5F6F7] rounded-[10px] border border-[#E3E7EB]">
+              <div className="w-6 h-6 border-2 border-[#24364B] border-t-transparent rounded-full animate-spin mx-auto mb-2.5" />
+              <p className="text-xs font-semibold text-[#202B38]">{progressText}</p>
             </div>
           )}
 
-          {/* Results Summary & Preview */}
           {!isProcessing && matchedResults.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-4 py-3 rounded-xl text-xs text-emerald-900">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="font-semibold">
-                    {matchedResults.length} student photos matched successfully!
-                  </span>
-                </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between bg-[#F5F6F7] border border-[#E3E7EB] px-4 py-2.5 rounded-lg text-xs">
+                <StatusText
+                  tone="success"
+                  label={`${matchedResults.length} photos matched`}
+                />
                 {unmatchedFiles.length > 0 && (
-                  <span className="text-[11px] text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded font-mono">
-                    {unmatchedFiles.length} files unmatched
+                  <span className="text-[11px] font-mono text-[#C18A38]">
+                    {unmatchedFiles.length} unmatched files
                   </span>
                 )}
               </div>
 
-              {/* Matched Preview Table */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+              <div className="border border-[#E3E7EB] rounded-[10px] overflow-hidden max-h-60 overflow-y-auto">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 font-semibold text-slate-600">
+                  <thead className="bg-[#F5F6F7] sticky top-0 border-b border-[#E3E7EB] text-[11px] font-semibold uppercase tracking-wider text-[#75808C]">
                     <tr>
-                      <th className="py-2.5 px-3">Photo Preview</th>
-                      <th className="py-2.5 px-3">Matched Student</th>
+                      <th className="py-2.5 px-3">Photo</th>
+                      <th className="py-2.5 px-3">Student</th>
                       <th className="py-2.5 px-3">Roll / ID</th>
-                      <th className="py-2.5 px-3">ZIP Filename</th>
-                      <th className="py-2.5 px-3 text-right">Status</th>
+                      <th className="py-2.5 px-3">Filename</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[#E3E7EB]">
                     {matchedResults.map((m) => (
-                      <tr key={m.studentId} className="hover:bg-slate-50/60">
+                      <tr key={m.studentId} className="hover:bg-[#F5F6F7]/70">
                         <td className="py-2 px-3">
                           <img
                             src={m.photoDataUrl}
                             alt={m.studentName}
-                            className="w-8 h-8 rounded-md object-cover border border-slate-200 shadow-xs"
+                            className="w-8 h-8 rounded object-cover border border-[#E3E7EB]"
                           />
                         </td>
-                        <td className="py-2 px-3 font-semibold text-slate-900">
+                        <td className="py-2 px-3 font-semibold text-[#202B38]">
                           {m.studentName}
                         </td>
-                        <td className="py-2 px-3 font-mono text-slate-500 text-[11px]">
-                          Roll: {m.rollNo || '—'} · {m.idCardNumber || m.studentId}
+                        <td className="py-2 px-3 font-mono text-[#536477] text-[11px]">
+                          {m.rollNo || '—'} · {m.idCardNumber || m.studentId}
                         </td>
-                        <td className="py-2 px-3 font-mono text-slate-600 text-[11px] truncate max-w-[140px]">
+                        <td className="py-2 px-3 font-mono text-[#536477] text-[11px] truncate max-w-[140px]">
                           {m.matchedFilename}
                         </td>
                         <td className="py-2 px-3 text-right">
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                            {m.isExistingReplaced ? 'Replaces Photo' : 'New Photo'}
-                          </span>
+                          <StatusText
+                            tone={m.isExistingReplaced ? 'warning' : 'success'}
+                            label={m.isExistingReplaced ? 'Replace' : 'Attach'}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -364,45 +347,35 @@ export const BulkPhotoZipModal: React.FC<BulkPhotoZipModalProps> = ({
             </div>
           )}
 
-          {/* Unmatched Files details if any */}
           {!isProcessing && unmatchedFiles.length > 0 && (
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
-              <span className="font-semibold text-slate-800 block mb-1">
-                Unmatched Files ({unmatchedFiles.length}):
-              </span>
-              <p className="text-[11px] text-slate-500 mb-2">
-                These photos could not be linked to any student with current match criteria ({matchCriteria}):
+            <div className="p-3 bg-[#F5F6F7] rounded-lg border border-[#E3E7EB] text-xs">
+              <p className="font-semibold text-[#202B38] mb-1">
+                Unmatched Files ({unmatchedFiles.length})
               </p>
-              <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
-                {unmatchedFiles.map((fn, idx) => (
-                  <span
-                    key={idx}
-                    className="text-[10px] font-mono bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-600"
-                  >
-                    {fn}
-                  </span>
-                ))}
-              </div>
+              <p className="text-[11px] text-[#75808C] font-mono break-all">
+                {unmatchedFiles.join(', ')}
+              </p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-[#E3E7EB] bg-[#F5F6F7] flex items-center justify-between">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+            className="px-4 py-2 text-xs font-semibold text-[#202B38] bg-white border border-[#E3E7EB] hover:bg-[#F0F2F4] rounded-lg"
           >
             Cancel
           </button>
 
           <button
+            type="button"
             onClick={handleApply}
             disabled={matchedResults.length === 0}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] disabled:opacity-40 rounded-lg"
           >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Apply {matchedResults.length} Photos to ID Cards</span>
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Apply {matchedResults.length} Photos</span>
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SchoolSettings, Student } from '../../types';
-import { X, Upload, User, AlertCircle, Camera, Check } from 'lucide-react';
+import { X, Upload, User, AlertCircle } from 'lucide-react';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -27,7 +27,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     conveyance: 'No',
     session: schoolSettings.academicSession,
     rollNo: '',
-    classGrade: 'Class X',
+    classGrade: 'Class X - A',
     bloodGroup: 'B+',
     photoUrl: '',
     photoCrop: { zoom: 1, x: 0, y: 0 },
@@ -51,7 +51,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         conveyance: 'No',
         session: schoolSettings.academicSession,
         rollNo: '',
-        classGrade: 'Class X',
+        classGrade: 'Class X - A',
         bloodGroup: 'B+',
         photoUrl: '',
         photoCrop: { zoom: 1, x: 0, y: 0 },
@@ -68,14 +68,12 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       setError('Please upload a valid image file (PNG, JPG, JPEG, or WebP).');
       return;
     }
 
-    // Validate size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('Photo size exceeds 5MB limit. Please upload an image under 5MB.');
       return;
@@ -136,7 +134,9 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       bloodGroup: formData.bloodGroup?.trim(),
       photoUrl: formData.photoUrl,
       photoCrop: formData.photoCrop || { zoom: 1, x: 0, y: 0 },
-      idCardNumber: formData.idCardNumber || `SCH-${(formData.session || '2025').split('-')[0]}-${Math.floor(1000 + Math.random() * 9000)}`,
+      idCardNumber:
+        formData.idCardNumber ||
+        `SCH-${(formData.session || '2025').split('-')[0]}-${Math.floor(1000 + Math.random() * 9000)}`,
       emergencyContact: formData.emergencyContact?.trim() || formData.contactNumber.trim(),
       isCardGenerated: studentToEdit ? studentToEdit.isCardGenerated : false,
       createdAt: studentToEdit ? studentToEdit.createdAt : new Date().toISOString(),
@@ -147,37 +147,46 @@ export const StudentModal: React.FC<StudentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+    <div
+      className="no-print fixed inset-0 z-50 bg-[#202B38]/45 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="bg-white rounded-[12px] border border-[#E3E7EB] shadow-xl w-full max-w-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-[#E3E7EB] flex items-center justify-between bg-[#F5F6F7]">
           <div>
-            <h3 className="text-base font-bold text-slate-900">
-              {studentToEdit ? 'Edit Student Record' : 'Enroll New Student'}
+            <h3 className="text-base font-bold text-[#202B38]">
+              {studentToEdit ? 'Edit Student Record' : 'Add Student'}
             </h3>
-            <p className="text-xs text-slate-500">
-              All 8 mandatory Indian school ID card fields are required for CR80 card generation.
+            <p className="text-xs text-[#75808C] mt-0.5">
+              Complete the required student dossier fields for CR80 card printing and QR verification.
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors"
+            aria-label="Close modal"
+            className="p-1.5 rounded-lg text-[#75808C] hover:text-[#202B38] hover:bg-[#E3E7EB]/60 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {error && (
-          <div className="mx-6 mt-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2 text-xs text-red-700">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+          <div className="mx-6 mt-4 p-3 rounded-lg bg-[#C44949]/10 border border-[#C44949]/30 flex items-center gap-2 text-xs text-[#C44949]">
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Photo & Core Name Row */}
-          <div className="flex items-start gap-5">
+          <div className="flex flex-col sm:flex-row items-start gap-5">
             <div className="flex flex-col items-center shrink-0">
-              <div className="w-20 h-24 rounded-lg border border-slate-300 bg-slate-100 overflow-hidden flex items-center justify-center relative group">
+              <div className="w-20 h-24 rounded-lg border border-[#E3E7EB] bg-[#F5F6F7] overflow-hidden flex items-center justify-center relative group">
                 {formData.photoUrl ? (
                   <img
                     src={formData.photoUrl}
@@ -189,25 +198,35 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <User className="w-8 h-8 text-slate-400" />
+                  <User className="w-8 h-8 text-[#75808C]" />
                 )}
-                <label className="absolute inset-0 bg-black/40 text-white flex flex-col items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                <label className="absolute inset-0 bg-[#202B38]/60 text-white flex flex-col items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
                   <Upload className="w-4 h-4 mb-0.5" />
                   <span>Change</span>
-                  <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handlePhotoUpload} className="hidden" />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
                 </label>
               </div>
 
               <div className="flex items-center gap-2 mt-1.5">
-                <label className="text-[11px] text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
+                <label className="text-[11px] text-[#24364B] hover:underline cursor-pointer font-semibold">
                   Upload Photo
-                  <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handlePhotoUpload} className="hidden" />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
                 </label>
                 {formData.photoUrl && (
                   <button
                     type="button"
                     onClick={() => setShowPhotoCrop(!showPhotoCrop)}
-                    className="text-[10px] text-slate-600 hover:text-slate-900 underline"
+                    className="text-[11px] text-[#536477] hover:text-[#202B38] underline"
                   >
                     Adjust
                   </button>
@@ -215,10 +234,10 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  1. Student Full Name <span className="text-red-500">*</span>
+            <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                  Student Full Name <span className="text-[#C44949]">*</span>
                 </label>
                 <input
                   type="text"
@@ -226,39 +245,44 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                   value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Aarav Sharma"
-                  className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Class / Grade</label>
+                <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                  Class & Section
+                </label>
                 <input
                   type="text"
                   value={formData.classGrade || ''}
                   onChange={(e) => setFormData({ ...formData, classGrade: e.target.value })}
-                  placeholder="e.g. Class X - Section A"
-                  className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  placeholder="e.g. Class X - A"
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Roll Number</label>
+                <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                  Roll Number
+                </label>
                 <input
                   type="text"
                   value={formData.rollNo || ''}
                   onChange={(e) => setFormData({ ...formData, rollNo: e.target.value })}
                   placeholder="e.g. 10-A-24"
-                  className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] font-mono"
                 />
               </div>
             </div>
           </div>
 
-          {/* Photo Crop Fine-tune slider */}
           {showPhotoCrop && formData.photoUrl && (
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-3 gap-3 text-[11px]">
+            <div className="bg-[#F5F6F7] p-3 rounded-lg border border-[#E3E7EB] grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
               <div>
-                <label className="block text-slate-600 mb-0.5">Zoom: {(formData.photoCrop?.zoom || 1).toFixed(1)}x</label>
+                <label className="block text-[#536477] mb-0.5">
+                  Zoom: {(formData.photoCrop?.zoom || 1).toFixed(1)}x
+                </label>
                 <input
                   type="range"
                   min="1"
@@ -271,11 +295,13 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                       photoCrop: { ...formData.photoCrop!, zoom: parseFloat(e.target.value) },
                     })
                   }
-                  className="w-full"
+                  className="w-full accent-[#24364B]"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-0.5">Horizontal: {formData.photoCrop?.x || 0}%</label>
+                <label className="block text-[#536477] mb-0.5">
+                  Horizontal: {formData.photoCrop?.x || 0}%
+                </label>
                 <input
                   type="range"
                   min="-30"
@@ -288,11 +314,13 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                       photoCrop: { ...formData.photoCrop!, x: parseInt(e.target.value) },
                     })
                   }
-                  className="w-full"
+                  className="w-full accent-[#24364B]"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-0.5">Vertical: {formData.photoCrop?.y || 0}%</label>
+                <label className="block text-[#536477] mb-0.5">
+                  Vertical: {formData.photoCrop?.y || 0}%
+                </label>
                 <input
                   type="range"
                   min="-30"
@@ -305,17 +333,16 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                       photoCrop: { ...formData.photoCrop!, y: parseInt(e.target.value) },
                     })
                   }
-                  className="w-full"
+                  className="w-full accent-[#24364B]"
                 />
               </div>
             </div>
           )}
 
-          {/* All 8 Required Fields Input Grid */}
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#E3E7EB]">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                2. Father's Name <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                Father&apos;s Name <span className="text-[#C44949]">*</span>
               </label>
               <input
                 type="text"
@@ -323,13 +350,13 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 value={formData.fatherName || ''}
                 onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
                 placeholder="e.g. Rajesh Sharma"
-                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                3. Mother's Name <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                Mother&apos;s Name <span className="text-[#C44949]">*</span>
               </label>
               <input
                 type="text"
@@ -337,13 +364,13 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 value={formData.motherName || ''}
                 onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
                 placeholder="e.g. Sunita Sharma"
-                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                4. Contact Number <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                Contact Number <span className="text-[#C44949]">*</span>
               </label>
               <input
                 type="text"
@@ -351,13 +378,13 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 value={formData.contactNumber || ''}
                 onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
                 placeholder="e.g. +91 98765 43210"
-                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                5. Date of Birth (DD/MM/YYYY) <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                Date of Birth (DD/MM/YYYY) <span className="text-[#C44949]">*</span>
               </label>
               <input
                 type="text"
@@ -365,18 +392,20 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 value={formData.dob || ''}
                 onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
                 placeholder="14/08/2009"
-                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                7. Conveyance (Bus Pass) <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                Conveyance (Bus Route) <span className="text-[#C44949]">*</span>
               </label>
               <select
                 value={formData.conveyance || 'No'}
-                onChange={(e) => setFormData({ ...formData, conveyance: e.target.value as 'Yes' | 'No' })}
-                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 font-semibold"
+                onChange={(e) =>
+                  setFormData({ ...formData, conveyance: e.target.value as 'Yes' | 'No' })
+                }
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B]"
               >
                 <option value="No">No (Private Commute)</option>
                 <option value="Yes">Yes (School Bus Enrolled)</option>
@@ -384,8 +413,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                8. Academic Session <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-[#202B38] mb-1">
+                Academic Session <span className="text-[#C44949]">*</span>
               </label>
               <input
                 type="text"
@@ -393,15 +422,14 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 value={formData.session || schoolSettings.academicSession}
                 onChange={(e) => setFormData({ ...formData, session: e.target.value })}
                 placeholder="2025-2026"
-                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] font-mono"
               />
             </div>
           </div>
 
-          {/* 6. Residential Address */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              6. Residential Address <span className="text-red-500">*</span>
+            <label className="block text-xs font-semibold text-[#202B38] mb-1">
+              Residential Address <span className="text-[#C44949]">*</span>
             </label>
             <textarea
               required
@@ -409,21 +437,21 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               value={formData.address || ''}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder="e.g. Flat 402, Shanti Heights, Sector 14, Rohini, New Delhi - 110085"
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-[#E3E7EB] focus:outline-none focus:border-[#24364B] resize-none"
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+          <div className="pt-4 border-t border-[#E3E7EB] flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-[#202B38] bg-white border border-[#E3E7EB] hover:bg-[#F0F2F4] rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+              className="px-4 py-2 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg transition-colors"
             >
               {studentToEdit ? 'Save Changes' : 'Save Student'}
             </button>

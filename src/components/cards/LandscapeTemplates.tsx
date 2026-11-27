@@ -150,22 +150,25 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
   );
 
   // Template 2: Royal Navy & Gold Institutional
-  const renderNavyGoldInst = () => (
-    <>
-      <rect x="0" y="0" width="214" height="540" fill={ink} />
-      <line x1="214" y1="0" x2="214" y2="540" stroke={accent} strokeWidth="4" />
+  const renderNavyGoldInst = () => {
+    const sideLogoSize = Math.min(customLogoSize, 86);
+    const sidePhotoY = logoVisible ? Math.max(114, 18 + sideLogoSize + 12) : 34;
+    return (
+      <>
+        <rect x="0" y="0" width="214" height="540" fill={ink} />
+        <line x1="214" y1="0" x2="214" y2="540" stroke={accent} strokeWidth="4" />
 
-      <rect x="214" y="0" width="642" height="92" fill="#f8fafc" />
-      <line x1="214" y1="92" x2="856" y2="92" stroke={accent} strokeWidth="2" />
+        <rect x="214" y="0" width="642" height="92" fill="#f8fafc" />
+        <line x1="214" y1="92" x2="856" y2="92" stroke={accent} strokeWidth="2" />
 
-      {logoVisible && <Logo schoolSettings={schoolSettings} x={107 - (customLogoSize / 2)} y={18} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
-      <Photo student={student} x={107 - (customPhotoW / 2)} y={114} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 6} borderColor={accent} />
+        {logoVisible && <Logo schoolSettings={schoolSettings} x={107 - (sideLogoSize / 2)} y={18} size={sideLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
+        <Photo student={student} x={107 - (customPhotoW / 2)} y={sidePhotoY} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 6} borderColor={accent} />
 
-      <rect x="24" y={114 + customPhotoH + 16} width="166" height="30" rx="4" fill={accent} />
-      <TextBlock text="STUDENT CARD" x={24} y={114 + customPhotoH + 22} width={166} fontSize={13.5} weight={800} letterSpacing={1.2} anchor="middle" fill="#0f172a" />
-      {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={24} y={114 + customPhotoH + 56} width={166} fontSize={13.5} weight={700} anchor="middle" fill="#e2e8f0" />
-      )}
+        <rect x="24" y={sidePhotoY + customPhotoH + 16} width="166" height="30" rx="4" fill={accent} />
+        <TextBlock text="STUDENT CARD" x={24} y={sidePhotoY + customPhotoH + 22} width={166} fontSize={13.5} weight={800} letterSpacing={1.2} anchor="middle" fill="#0f172a" />
+        {sessionVisible && (
+          <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={24} y={sidePhotoY + customPhotoH + 56} width={166} fontSize={13.5} weight={700} anchor="middle" fill="#e2e8f0" />
+        )}
 
       <TextBlock text={schoolSettings.schoolName} x={238} y={14} width={592} fontSize={schoolNameSize} weight={800} role="heading" fill={ink} maxLines={1} />
       {visibleFields.schoolAddress !== false && schoolSettings.address && (
@@ -180,7 +183,8 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
       {renderFooterRow(238, 675, 424, ink)}
       <rect x="214" y="528" width="642" height="12" fill={ink} />
     </>
-  );
+    );
+  };
 
   // Template 3: Graphite Slate & Amber Horizon
   const renderCharcoalOrange = () => (
@@ -276,45 +280,51 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
   );
 
   // Template 6: Emerald Convent Horizon
-  const renderGreenCream = () => (
-    <>
-      <rect x="0" y="0" width="214" height="540" fill={ink} />
-      <line x1="214" y1="0" x2="214" y2="540" stroke={accent} strokeWidth="3.5" />
+  const renderGreenCream = () => {
+    const sideLogoSize = Math.min(customLogoSize, 86);
+    const sidePhotoY = logoVisible ? Math.max(114, 18 + sideLogoSize + 12) : 34;
+    return (
+      <>
+        <rect x="0" y="0" width="214" height="540" fill={ink} />
+        <line x1="214" y1="0" x2="214" y2="540" stroke={accent} strokeWidth="3.5" />
 
-      {logoVisible && <Logo schoolSettings={schoolSettings} x={107 - (customLogoSize / 2)} y={18} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
-      <Photo student={student} x={107 - (customPhotoW / 2)} y={114} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 8} borderColor={accent} />
+        {logoVisible && <Logo schoolSettings={schoolSettings} x={107 - (sideLogoSize / 2)} y={18} size={sideLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
+        <Photo student={student} x={107 - (customPhotoW / 2)} y={sidePhotoY} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 8} borderColor={accent} />
 
-      <rect x="24" y={114 + customPhotoH + 16} width="166" height="28" rx="14" fill={accent} />
-      <TextBlock text="IDENTITY PASS" x={24} y={114 + customPhotoH + 21} width={166} fontSize={13.5} weight={800} letterSpacing={1.1} anchor="middle" fill="#064e3b" />
+        <rect x="24" y={sidePhotoY + customPhotoH + 16} width="166" height="28" rx="14" fill={accent} />
+        <TextBlock text="IDENTITY PASS" x={24} y={sidePhotoY + customPhotoH + 21} width={166} fontSize={13.5} weight={800} letterSpacing={1.1} anchor="middle" fill="#064e3b" />
 
-      <TextBlock text={schoolSettings.schoolName} x={238} y={14} width={592} fontSize={schoolNameSize} weight={800} role="heading" fill={ink} maxLines={1} />
-      {visibleFields.schoolAddress !== false && schoolSettings.address && (
-        <TextBlock text={`${schoolSettings.address}${schoolSettings.contactNumber ? ` • ${schoolSettings.contactNumber}` : ''}`} x={238} y={54} width={592} fontSize={14.5} maxLines={1} fill={muted} weight={600} />
-      )}
-      <TextBlock text={student.name} x={238} y={96} width={592} fontSize={studentNameSize} weight={800} role="heading" fill={ink} />
-      <line x1="238" y1="136" x2="830" y2="136" stroke={accent} strokeWidth="2" />
+        <TextBlock text={schoolSettings.schoolName} x={238} y={14} width={592} fontSize={schoolNameSize} weight={800} role="heading" fill={ink} maxLines={1} />
+        {visibleFields.schoolAddress !== false && schoolSettings.address && (
+          <TextBlock text={`${schoolSettings.address}${schoolSettings.contactNumber ? ` • ${schoolSettings.contactNumber}` : ''}`} x={238} y={54} width={592} fontSize={14.5} maxLines={1} fill={muted} weight={600} />
+        )}
+        <TextBlock text={student.name} x={238} y={96} width={592} fontSize={studentNameSize} weight={800} role="heading" fill={ink} />
+        <line x1="238" y1="136" x2="830" y2="136" stroke={accent} strokeWidth="2" />
 
-      <IdentityMeta student={student} visibleFields={visibleFields} x={238} y={146} width={592} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#ecfdf5" />
-      {renderDetails2Col(238, 206, 592, 204)}
-      {renderFooterRow(238, 675, 424, ink)}
-      <rect x="214" y="528" width="642" height="12" fill={ink} />
-    </>
-  );
+        <IdentityMeta student={student} visibleFields={visibleFields} x={238} y={146} width={592} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#ecfdf5" />
+        {renderDetails2Col(238, 206, 592, 204)}
+        {renderFooterRow(238, 675, 424, ink)}
+        <rect x="214" y="528" width="642" height="12" fill={ink} />
+      </>
+    );
+  };
 
   // Template 7: Imperial Burgundy Archival
-  const renderBurgundyPremium = () => (
-    <>
-      <rect x="14" y="14" width="828" height="512" fill="none" stroke={accent} strokeWidth="2" />
-      <rect x="20" y="20" width="816" height="500" fill="none" stroke={ink} strokeWidth="1" />
+  const renderBurgundyPremium = () => {
+    const headerLogoSize = Math.min(customLogoSize, 82);
+    return (
+      <>
+        <rect x="14" y="14" width="828" height="512" fill="none" stroke={accent} strokeWidth="2" />
+        <rect x="20" y="20" width="816" height="500" fill="none" stroke={ink} strokeWidth="1" />
 
-      <rect x="21" y="21" width="814" height="90" fill={ink} />
-      {logoVisible && <Logo schoolSettings={schoolSettings} x={32} y={24} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
-      <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 32 + customLogoSize + 16 : 34} y={28} width={logoVisible ? 770 - (customLogoSize + 16) : 770} fontSize={schoolNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill="#ffffff" maxLines={1} />
-      {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 32 + customLogoSize + 16 : 34} y={68} width={500} fontSize={14} letterSpacing={1.2} weight={800} fill={accent} />
-      )}
+        <rect x="21" y="21" width="814" height="90" fill={ink} />
+        {logoVisible && <Logo schoolSettings={schoolSettings} x={32} y={24} size={headerLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
+        <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={28} width={logoVisible ? 770 - (headerLogoSize + 16) : 770} fontSize={schoolNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill="#ffffff" maxLines={1} />
+        {sessionVisible && (
+          <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={68} width={500} fontSize={14} letterSpacing={1.2} weight={800} fill={accent} />
+        )}
 
-      <Photo student={student} x={34} y={128} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
+        <Photo student={student} x={34} y={128} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
 
       <TextBlock text={student.name} x={224} y={120} width={590} fontSize={studentNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill={ink} />
       <line x1="224" y1="158" x2="814" y2="158" stroke={accent} strokeWidth="1.5" />
@@ -336,7 +346,8 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
         />
       )}
     </>
-  );
+    );
+  };
 
   // Template 8: Executive Cyan Clean Rail
   const renderMinimalWhiteGrid = () => (
@@ -389,30 +400,34 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
   );
 
   // Template 10: Midnight Cyber Amber
-  const renderDarkCharcoal = () => (
-    <>
-      <rect x="0" y="0" width="214" height="540" fill={ink} />
-      <line x1="214" y1="0" x2="214" y2="540" stroke={accent} strokeWidth="3.5" />
+  const renderDarkCharcoal = () => {
+    const sideLogoSize = Math.min(customLogoSize, 86);
+    const sidePhotoY = logoVisible ? Math.max(114, 18 + sideLogoSize + 12) : 34;
+    return (
+      <>
+        <rect x="0" y="0" width="214" height="540" fill={ink} />
+        <line x1="214" y1="0" x2="214" y2="540" stroke={accent} strokeWidth="3.5" />
 
-      {logoVisible && <Logo schoolSettings={schoolSettings} x={107 - (customLogoSize / 2)} y={18} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
-      <Photo student={student} x={107 - (customPhotoW / 2)} y={114} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 6} borderColor={accent} />
+        {logoVisible && <Logo schoolSettings={schoolSettings} x={107 - (sideLogoSize / 2)} y={18} size={sideLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
+        <Photo student={student} x={107 - (customPhotoW / 2)} y={sidePhotoY} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 6} borderColor={accent} />
 
-      <rect x="24" y={114 + customPhotoH + 16} width="166" height="28" rx="4" fill={accent} />
-      <TextBlock text="STUDENT ID" x={24} y={114 + customPhotoH + 21} width={166} fontSize={13.5} weight={800} letterSpacing={1.2} anchor="middle" fill="#0f172a" />
+        <rect x="24" y={sidePhotoY + customPhotoH + 16} width="166" height="28" rx="4" fill={accent} />
+        <TextBlock text="STUDENT ID" x={24} y={sidePhotoY + customPhotoH + 21} width={166} fontSize={13.5} weight={800} letterSpacing={1.2} anchor="middle" fill="#0f172a" />
 
-      <TextBlock text={schoolSettings.schoolName} x={238} y={14} width={592} fontSize={schoolNameSize} weight={800} role="heading" fill={ink} maxLines={1} />
-      {visibleFields.schoolAddress !== false && schoolSettings.address && (
-        <TextBlock text={`${schoolSettings.address}${schoolSettings.contactNumber ? ` • ${schoolSettings.contactNumber}` : ''}`} x={238} y={54} width={592} fontSize={14.5} maxLines={1} fill={muted} weight={600} />
-      )}
-      <TextBlock text={student.name} x={238} y={96} width={592} fontSize={studentNameSize} weight={800} role="heading" fill={ink} />
-      <line x1="238" y1="136" x2="830" y2="136" stroke={accent} strokeWidth="2" />
+        <TextBlock text={schoolSettings.schoolName} x={238} y={14} width={592} fontSize={schoolNameSize} weight={800} role="heading" fill={ink} maxLines={1} />
+        {visibleFields.schoolAddress !== false && schoolSettings.address && (
+          <TextBlock text={`${schoolSettings.address}${schoolSettings.contactNumber ? ` • ${schoolSettings.contactNumber}` : ''}`} x={238} y={54} width={592} fontSize={14.5} maxLines={1} fill={muted} weight={600} />
+        )}
+        <TextBlock text={student.name} x={238} y={96} width={592} fontSize={studentNameSize} weight={800} role="heading" fill={ink} />
+        <line x1="238" y1="136" x2="830" y2="136" stroke={accent} strokeWidth="2" />
 
-      <IdentityMeta student={student} visibleFields={visibleFields} x={238} y={146} width={592} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#f8fafc" />
-      {renderDetails2Col(238, 206, 592, 204)}
-      {renderFooterRow(238, 675, 424, ink)}
-      <rect x="214" y="528" width="642" height="12" fill={ink} />
-    </>
-  );
+        <IdentityMeta student={student} visibleFields={visibleFields} x={238} y={146} width={592} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#f8fafc" />
+        {renderDetails2Col(238, 206, 592, 204)}
+        {renderFooterRow(238, 675, 424, ink)}
+        <rect x="214" y="528" width="642" height="12" fill={ink} />
+      </>
+    );
+  };
 
   // Template 11: Scarlet Diagonal Velocity
   const renderRedDiagonal = () => (
@@ -441,40 +456,44 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
   );
 
   // Template 12: Heritage Double-Pinstripe
-  const renderClassicBorder = () => (
-    <>
-      <rect x="14" y="14" width="828" height="512" fill="none" stroke={ink} strokeWidth="2.5" />
-      <rect x="20" y="20" width="816" height="500" fill="none" stroke={accent} strokeWidth="1" />
+  const renderClassicBorder = () => {
+    const headerLogoSize = Math.min(customLogoSize, 82);
+    const photoY = logoVisible ? Math.max(120, 24 + headerLogoSize + 12) : 120;
+    return (
+      <>
+        <rect x="14" y="14" width="828" height="512" fill="none" stroke={ink} strokeWidth="2.5" />
+        <rect x="20" y="20" width="816" height="500" fill="none" stroke={accent} strokeWidth="1" />
 
-      {logoVisible && <Logo schoolSettings={schoolSettings} x={32} y={24} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
-      <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 32 + customLogoSize + 16 : 34} y={28} width={logoVisible ? 770 - (customLogoSize + 16) : 770} fontSize={schoolNameSize} weight={800} role="heading" family="Cinzel, Georgia, serif" fill={ink} maxLines={1} />
-      {sessionVisible && (
-        <TextBlock text={`ACADEMIC SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 32 + customLogoSize + 16 : 34} y={68} width={560} fontSize={14} letterSpacing={1.1} weight={800} fill={accent} />
-      )}
+        {logoVisible && <Logo schoolSettings={schoolSettings} x={32} y={24} size={headerLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
+        <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={28} width={logoVisible ? 770 - (headerLogoSize + 16) : 770} fontSize={schoolNameSize} weight={800} role="heading" family="Cinzel, Georgia, serif" fill={ink} maxLines={1} />
+        {sessionVisible && (
+          <TextBlock text={`ACADEMIC SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 32 + headerLogoSize + 16 : 34} y={68} width={560} fontSize={14} letterSpacing={1.1} weight={800} fill={accent} />
+        )}
 
-      <Photo student={student} x={34} y={120} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
+        <Photo student={student} x={34} y={photoY} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
 
-      <TextBlock text={student.name} x={224} y={112} width={590} fontSize={studentNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill={ink} />
-      <line x1="224" y1="150" x2="814" y2="150" stroke={accent} strokeWidth="1.5" />
+        <TextBlock text={student.name} x={224} y={112} width={590} fontSize={studentNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill={ink} />
+        <line x1="224" y1="150" x2="814" y2="150" stroke={accent} strokeWidth="1.5" />
 
-      <IdentityMeta student={student} visibleFields={visibleFields} x={224} y={160} width={590} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#fefce8" />
-      {renderDetails2Col(224, 218, 590, 190)}
-      {renderFooterRow(224, 670, 416, ink)}
-      {(visibleFields.schoolAddress !== false || visibleFields.schoolContact !== false) && (
-        <TextBlock
-          text={[visibleFields.schoolAddress !== false ? schoolSettings.address : '', visibleFields.schoolContact !== false ? schoolSettings.contactNumber : ''].filter(Boolean).join(' • ')}
-          x={28}
-          y={490}
-          width={800}
-          fontSize={cust?.addressFontSize || 15}
-          maxLines={1}
-          anchor="middle"
-          fill={ink}
-          weight={700}
-        />
-      )}
-    </>
-  );
+        <IdentityMeta student={student} visibleFields={visibleFields} x={224} y={160} width={590} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#fefce8" />
+        {renderDetails2Col(224, 218, 590, 190)}
+        {renderFooterRow(224, 670, 416, ink)}
+        {(visibleFields.schoolAddress !== false || visibleFields.schoolContact !== false) && (
+          <TextBlock
+            text={[visibleFields.schoolAddress !== false ? schoolSettings.address : '', visibleFields.schoolContact !== false ? schoolSettings.contactNumber : ''].filter(Boolean).join(' • ')}
+            x={28}
+            y={490}
+            width={800}
+            fontSize={cust?.addressFontSize || 15}
+            maxLines={1}
+            anchor="middle"
+            fill={ink}
+            weight={700}
+          />
+        )}
+      </>
+    );
+  };
 
   // Template 13: Azure Sapphire Split Wing
   const renderPhotoPanel = () => (
@@ -503,28 +522,31 @@ export const RenderLandscapeTemplate: React.FC<LandscapeTemplateProps> = ({
   );
 
   // Template 14: Oxford Seal Collegiate
-  const renderCrestHeader = () => (
-    <>
-      <rect x="0" y="0" width="856" height="98" fill={ink} />
-      <line x1="0" y1="98" x2="856" y2="98" stroke={accent} strokeWidth="3.5" />
+  const renderCrestHeader = () => {
+    const headerLogoSize = Math.min(customLogoSize, 76);
+    return (
+      <>
+        <rect x="0" y="0" width="856" height="98" fill={ink} />
+        <line x1="0" y1="98" x2="856" y2="98" stroke={accent} strokeWidth="3.5" />
 
-      {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={12} size={customLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
-      <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={16} width={logoVisible ? 792 - (customLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" family="Cinzel, Georgia, serif" fill="#ffffff" maxLines={1} />
-      {sessionVisible && (
-        <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + customLogoSize + 16 : 30} y={56} width={560} fontSize={14} weight={800} fill={accent} />
-      )}
+        {logoVisible && <Logo schoolSettings={schoolSettings} x={28} y={11} size={headerLogoSize} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
+        <TextBlock text={schoolSettings.schoolName} x={logoVisible ? 28 + headerLogoSize + 16 : 30} y={16} width={logoVisible ? 792 - (headerLogoSize + 16) : 796} fontSize={schoolNameSize} weight={800} role="heading" family="Cinzel, Georgia, serif" fill="#ffffff" maxLines={1} />
+        {sessionVisible && (
+          <TextBlock text={`SESSION ${student.session || schoolSettings.academicSession}`} x={logoVisible ? 28 + headerLogoSize + 16 : 30} y={56} width={560} fontSize={14} weight={800} fill={accent} />
+        )}
 
-      <Photo student={student} x={32} y={128} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
+        <Photo student={student} x={32} y={128} width={customPhotoW} height={customPhotoH} radius={customPhotoR ?? 4} borderColor={accent} />
 
-      <TextBlock text={student.name} x={220} y={118} width={606} fontSize={studentNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill={ink} />
-      <line x1="220" y1="156" x2="826" y2="156" stroke={accent} strokeWidth="1.5" />
+        <TextBlock text={student.name} x={220} y={118} width={606} fontSize={studentNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" fill={ink} />
+        <line x1="220" y1="156" x2="826" y2="156" stroke={accent} strokeWidth="1.5" />
 
-      <IdentityMeta student={student} visibleFields={visibleFields} x={220} y={166} width={606} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#fefce8" />
-      {renderDetails2Col(220, 222, 606, 188)}
-      {renderFooterRow(220, 675, 418, ink)}
-      {renderBottomBar(ink, accent, '#ffffff')}
-    </>
-  );
+        <IdentityMeta student={student} visibleFields={visibleFields} x={220} y={166} width={606} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#fefce8" />
+        {renderDetails2Col(220, 222, 606, 188)}
+        {renderFooterRow(220, 675, 418, ink)}
+        {renderBottomBar(ink, accent, '#ffffff')}
+      </>
+    );
+  };
 
   // Template 15: Amethyst Wave Modern
   const renderModernAsymmetric = () => (

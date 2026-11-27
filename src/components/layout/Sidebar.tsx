@@ -3,12 +3,17 @@ import { ActiveNavTab, SchoolSettings } from '../../types';
 import {
   LayoutDashboard,
   Users,
-  FileSpreadsheet,
+  Layers,
   Palette,
-  Sliders,
+  FileSpreadsheet,
   Printer,
+  History,
   Settings,
-  ShieldCheck,
+  HelpCircle,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  X,
   CreditCard,
 } from 'lucide-react';
 
@@ -17,7 +22,12 @@ interface SidebarProps {
   onSelectTab: (tab: ActiveNavTab) => void;
   schoolSettings: SchoolSettings;
   studentCount: number;
-  isDemoMode: boolean;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  isMobileOpen: boolean;
+  onCloseMobile: () => void;
+  onOpenHelp: () => void;
+  onLogout: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -25,81 +35,141 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   schoolSettings,
   studentCount,
-  isDemoMode,
+  isCollapsed,
+  onToggleCollapse,
+  isMobileOpen,
+  onCloseMobile,
+  onOpenHelp,
+  onLogout,
 }) => {
-  const navItems: { id: ActiveNavTab; label: string; icon: React.ElementType; badge?: string }[] = [
+  const navItems: {
+    id: ActiveNavTab;
+    label: string;
+    icon: React.ElementType;
+    count?: number;
+  }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'students', label: 'Students Directory', icon: Users, badge: studentCount > 0 ? String(studentCount) : undefined },
-    { id: 'import', label: 'Import Excel / CSV', icon: FileSpreadsheet },
-    { id: 'templates', label: 'ID Card Designs', icon: Palette, badge: '30' },
-    { id: 'editor', label: 'Card Customizer', icon: Sliders },
-    { id: 'export', label: 'Print & Export', icon: Printer },
-    { id: 'settings', label: 'School Settings', icon: Settings },
+    { id: 'students', label: 'Students', icon: Users, count: studentCount },
+    { id: 'editor', label: 'ID Card Studio', icon: Layers },
+    { id: 'templates', label: 'Templates', icon: Palette, count: 30 },
+    { id: 'import', label: 'Bulk Generation', icon: FileSpreadsheet },
+    { id: 'export', label: 'Batch Print', icon: Printer },
+    { id: 'history', label: 'Export History', icon: History },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  return (
-    <aside className="no-print w-64 bg-slate-900 text-slate-300 flex flex-col justify-between shrink-0 h-screen sticky top-0 border-r border-slate-800 select-none z-30">
-      {/* Top School Brand Identity */}
+  const handleNavClick = (id: ActiveNavTab) => {
+    onSelectTab(id);
+    onCloseMobile();
+  };
+
+  const renderSidebarBody = (collapsed: boolean) => (
+    <div className="flex flex-col h-full justify-between bg-white border-r border-[#E3E7EB] select-none">
+      {/* Top Brand Lockup */}
       <div>
-        <div className="p-4 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-white/10 p-1 flex items-center justify-center shrink-0 border border-white/10">
-            {schoolSettings.logoUrl ? (
-              <img
-                src={schoolSettings.logoUrl}
-                alt="School Seal"
-                className="w-full h-full object-contain"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <CreditCard className="w-5 h-5 text-amber-400" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-bold text-white tracking-tight truncate leading-tight">
-              {schoolSettings.schoolName}
-            </h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[11px] text-slate-400 font-mono">
-                {schoolSettings.academicSession}
-              </span>
-              {isDemoMode && (
-                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-medium">
-                  Demo
-                </span>
+        <div
+          className={`h-16 border-b border-[#E3E7EB] flex items-center ${
+            collapsed ? 'justify-center px-2' : 'justify-between px-4'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-[#24364B] text-white flex items-center justify-center shrink-0 overflow-hidden">
+              {schoolSettings.logoUrl ? (
+                <img
+                  src={schoolSettings.logoUrl}
+                  alt={schoolSettings.schoolName}
+                  className="w-full h-full object-contain bg-white p-0.5"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <CreditCard className="w-4 h-4 text-[#A77C50]" />
               )}
             </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <span className="text-sm font-extrabold tracking-tight text-[#202B38] block truncate">
+                  THE ID MAKER
+                </span>
+                <span className="text-[11px] text-[#75808C] block truncate">
+                  {schoolSettings.schoolName}
+                </span>
+              </div>
+            )}
           </div>
+
+          {/* Desktop Collapse Button */}
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+              className="hidden lg:flex p-1.5 rounded-lg text-[#75808C] hover:text-[#202B38] hover:bg-[#F0F2F4] transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Mobile Close Button */}
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            aria-label="Close navigation menu"
+            className="lg:hidden p-1.5 rounded-lg text-[#75808C] hover:text-[#202B38] hover:bg-[#F0F2F4]"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="p-3 space-y-1">
-          <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-            Workspace
+        {collapsed && (
+          <div className="hidden lg:flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+              className="p-1.5 rounded-lg text-[#75808C] hover:text-[#202B38] hover:bg-[#F0F2F4] transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
+        )}
+
+        {/* Primary Workspace Navigation */}
+        <nav className="p-2.5 space-y-0.5" aria-label="Primary Sidebar Navigation">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
-                onClick={() => onSelectTab(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition-colors text-left ${
+                type="button"
+                onClick={() => handleNavClick(item.id)}
+                title={collapsed ? item.label : undefined}
+                aria-current={isActive ? 'page' : undefined}
+                className={`w-full flex items-center ${
+                  collapsed ? 'justify-center px-2' : 'justify-between px-3'
+                } py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap ${
                   isActive
-                    ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-[#24364B] text-white font-semibold'
+                    : 'text-[#536477] hover:bg-[#F0F2F4] hover:text-[#202B38]'
                 }`}
               >
-                <div className="flex items-center gap-2.5 truncate">
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  <span className="truncate">{item.label}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon
+                    className={`w-[18px] h-[18px] shrink-0 ${
+                      isActive ? 'text-white' : 'text-[#75808C]'
+                    }`}
+                  />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
                 </div>
-                {item.badge && (
+                {!collapsed && item.count !== undefined && (
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                      isActive ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-300'
+                    className={`text-xs font-mono tabular-nums ${
+                      isActive ? 'text-white/80' : 'text-[#75808C]'
                     }`}
                   >
-                    {item.badge}
+                    {item.count}
                   </span>
                 )}
               </button>
@@ -108,16 +178,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Footer System Status */}
-      <div className="p-3 border-t border-slate-800 text-xs text-slate-400">
-        <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/60 flex items-center gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-200 truncate">CR80 Compliant</p>
-            <p className="text-[10px] text-slate-400 truncate">85.60 × 53.98 mm</p>
-          </div>
+      {/* Bottom Utility Section: Help & Support + User Profile */}
+      <div className="p-2.5 border-t border-[#E3E7EB] space-y-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            onOpenHelp();
+            onCloseMobile();
+          }}
+          title={collapsed ? 'Help & Support' : undefined}
+          className={`w-full flex items-center ${
+            collapsed ? 'justify-center px-2' : 'gap-2.5 px-3'
+          } py-2 text-[13px] font-medium text-[#536477] hover:text-[#202B38] hover:bg-[#F0F2F4] rounded-lg transition-colors whitespace-nowrap`}
+        >
+          <HelpCircle className="w-[18px] h-[18px] shrink-0 text-[#75808C]" />
+          {!collapsed && <span>Help & Support</span>}
+        </button>
+
+        <div
+          className={`flex items-center ${
+            collapsed ? 'justify-center p-1.5' : 'justify-between px-3 py-2'
+          } rounded-lg bg-[#F5F6F7] border border-[#E3E7EB]`}
+        >
+          {!collapsed && (
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[#24364B] text-white text-xs font-bold flex items-center justify-center shrink-0 uppercase">
+                {(schoolSettings.adminUsername || 'A').charAt(0)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#202B38] truncate">
+                  {schoolSettings.adminUsername || 'admin'}
+                </p>
+                <p className="text-[11px] text-[#75808C] truncate">Administrator</p>
+              </div>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onLogout}
+            title="Sign out"
+            aria-label="Sign out"
+            className="p-1.5 rounded-lg text-[#75808C] hover:text-[#C44949] hover:bg-white transition-colors shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Collapsible Sidebar */}
+      <aside
+        className={`no-print hidden lg:block shrink-0 h-screen sticky top-0 z-30 transition-all duration-200 ${
+          isCollapsed ? 'w-[68px]' : 'w-[244px]'
+        }`}
+      >
+        {renderSidebarBody(isCollapsed)}
+      </aside>
+
+      {/* Mobile Navigation Drawer */}
+      {isMobileOpen && (
+        <div
+          className="no-print fixed inset-0 z-50 lg:hidden flex"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile Navigation"
+        >
+          <div
+            className="fixed inset-0 bg-[#202B38]/40"
+            onClick={onCloseMobile}
+            aria-hidden="true"
+          />
+          <aside className="relative w-64 max-w-[80vw] h-full z-10 shadow-xl">
+            {renderSidebarBody(false)}
+          </aside>
+        </div>
+      )}
+    </>
   );
 };

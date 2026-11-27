@@ -207,4 +207,15 @@ export type ActiveNavTab =
   | 'templates'
   | 'editor'
   | 'export'
+  | 'history'
   | 'settings';
+
+export interface ExportHistoryRecord {
+  id: string;
+  timestamp: string;
+  format: 'A4 PDF' | 'CR80 PDF' | 'PNG' | 'Browser Print' | 'CSV';
+  fileName: string;
+  cardCount: number;
+  templateName: string;
+  orientation: 'portrait' | 'landscape';
+}

@@ -1,4 +1,4 @@
-import { SavedCustomTemplate, SchoolSettings, Student } from '../types';
+import { ExportHistoryRecord, SavedCustomTemplate, SchoolSettings, Student } from '../types';
 import { DEFAULT_SCHOOL_SETTINGS, DEMO_STUDENTS } from '../constants/initialData';
 
 const DB_NAME = 'ScholarCardPro_DB';
@@ -243,4 +243,47 @@ export async function idbGetCustomTemplates(): Promise<SavedCustomTemplate[]> {
 
   return [];
 }
+
+const EXPORT_HISTORY_KEY = 'scholarcard_export_history_v1';
+
+export function getExportHistory(): ExportHistoryRecord[] {
+  try {
+    const raw = localStorage.getItem(EXPORT_HISTORY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return [];
+}
+
+export function appendExportHistory(entry: Omit<ExportHistoryRecord, 'id' | 'timestamp'>): ExportHistoryRecord[] {
+  const current = getExportHistory();
+  const next: ExportHistoryRecord[] = [
+    {
+      ...entry,
+      id: `exp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+    },
+    ...current,
+  ].slice(0, 100);
+  try {
+    localStorage.setItem(EXPORT_HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // ignore quota errors
+  }
+  return next;
+}
+
+export function clearExportHistory(): ExportHistoryRecord[] {
+  try {
+    localStorage.removeItem(EXPORT_HISTORY_KEY);
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
 

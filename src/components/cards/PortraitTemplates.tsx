@@ -2,7 +2,7 @@ import React from 'react';
 import { CardRenderProps } from './CardShared';
 import { PortraitTemplateId } from '../../types';
 import {
-  CardCanvas, CardCode, Details, getPalette, IdentityMeta, Logo, Photo,
+  CardCanvas, CardCode, countTextLines, Details, getPalette, IdentityMeta, Logo, Photo,
   Signature, TextBlock,
 } from './CardDesignSystem';
 
@@ -155,35 +155,42 @@ export const RenderPortraitTemplate: React.FC<PortraitTemplateProps> = (props) =
   );
 
   // Helper for Header Title + Session (never clips or overlaps on 1 or 2 line names)
-  const renderHeaderTitle = (x: number, y: number, w: number, titleFill: string, sessionFill: string, family?: string) => (
-    <>
-      <TextBlock
-        text={schoolSettings.schoolName}
-        x={x}
-        y={y}
-        width={w}
-        fontSize={schoolNameSize}
-        lineHeight={1.08}
-        maxLines={2}
-        weight={800}
-        role="heading"
-        family={family}
-        fill={titleFill}
-      />
-      {sessionVisible && (
+  const renderHeaderTitle = (x: number, y: number, w: number, titleFill: string, sessionFill: string, family?: string) => {
+    const metrics = countTextLines(schoolSettings.schoolName, w, schoolNameSize, 2, 0, family?.includes('Cinzel') || family?.includes('Playfair') ? 1.15 : 1.06);
+    const titleHeight =
+      metrics.lineCount === 1
+        ? Math.ceil(metrics.effectiveSize * 1.18)
+        : Math.ceil(metrics.effectiveSize * 1.08 + metrics.effectiveSize * 1.15);
+    return (
+      <>
         <TextBlock
-          text={`SESSION ${student.session || schoolSettings.academicSession}`}
+          text={schoolSettings.schoolName}
           x={x}
-          y={y + (schoolSettings.schoolName.length > 18 ? 66 : 40)}
+          y={y}
           width={w}
-          fontSize={14}
+          fontSize={schoolNameSize}
+          lineHeight={1.08}
+          maxLines={2}
           weight={800}
-          letterSpacing={1.1}
-          fill={sessionFill}
+          role="heading"
+          family={family}
+          fill={titleFill}
         />
-      )}
-    </>
-  );
+        {sessionVisible && (
+          <TextBlock
+            text={`SESSION ${student.session || schoolSettings.academicSession}`}
+            x={x}
+            y={y + titleHeight + 4}
+            width={w}
+            fontSize={14}
+            weight={800}
+            letterSpacing={1.1}
+            fill={sessionFill}
+          />
+        )}
+      </>
+    );
+  };
 
   // Template 1: Red & Magenta Curved Academic (Flagship Gold-Standard)
   const renderRedMagentaCurved = () => (
@@ -483,50 +490,108 @@ export const RenderPortraitTemplate: React.FC<PortraitTemplateProps> = (props) =
   );
 
   // Template 12: Classic Collegiate Heritage
-  const renderSchoolCrest = () => (
-    <>
-      <rect x="14" y="14" width="512" height="828" fill="none" stroke={ink} strokeWidth="2.5" />
-      <rect x="20" y="20" width="500" height="816" fill="none" stroke={accent} strokeWidth="1" />
+  const renderSchoolCrest = () => {
+    const crestSize = Math.min(Math.max(customLogoSize, 52), 72);
+    const titleY = logoVisible ? 26 + crestSize + 8 : 34;
+    const titleFontSize = Math.min(schoolNameSize, 24);
+    const titleMetrics = countTextLines(schoolSettings.schoolName, 464, titleFontSize, 2, 0, 1.18);
+    const titleHeight =
+      titleMetrics.lineCount === 1
+        ? Math.ceil(titleMetrics.effectiveSize * 1.16)
+        : Math.ceil(titleMetrics.effectiveSize * 1.08 + titleMetrics.effectiveSize * 1.16);
+    const sessionY = titleY + titleHeight + 6;
+    const dividerY = sessionVisible ? sessionY + 20 : titleY + titleHeight + 8;
 
-      {logoVisible && <Logo schoolSettings={schoolSettings} x={270 - (Math.min(customLogoSize, 90) / 2)} y={24} size={Math.min(customLogoSize, 90)} shape={customLogoShape} badgeStyle={customLogoBadgeStyle} ringColor={accent} />}
-      <TextBlock
-        text={schoolSettings.schoolName}
-        x={32}
-        y={24 + Math.min(customLogoSize, 90) + 6}
-        width={476}
-        fontSize={schoolNameSize > 28 ? 28 : schoolNameSize}
-        weight={800}
-        role="heading"
-        family="Cinzel, Georgia, serif"
-        anchor="middle"
-        fill={ink}
-      />
-      {sessionVisible && (
+    const crestPhotoW = Math.min(customPhotoW, 144);
+    const crestPhotoH = Math.min(Math.max(customPhotoH - 12, 120), 142);
+    const photoY = dividerY + 12;
+    const nameY = photoY + crestPhotoH + 12;
+    const metaY = nameY + 42;
+    const detailsY = metaY + 56;
+    const detailsH = Math.max(200, 690 - detailsY);
+
+    return (
+      <>
+        <rect x="14" y="14" width="512" height="828" fill="none" stroke={ink} strokeWidth="2.5" />
+        <rect x="20" y="20" width="500" height="816" fill="none" stroke={accent} strokeWidth="1" />
+
+        {logoVisible && (
+          <Logo
+            schoolSettings={schoolSettings}
+            x={270 - crestSize / 2}
+            y={26}
+            size={crestSize}
+            shape={customLogoShape}
+            badgeStyle={customLogoBadgeStyle}
+            ringColor={accent}
+          />
+        )}
         <TextBlock
-          text={`STUDENT IDENTITY • SESSION ${student.session || schoolSettings.academicSession}`}
-          x={32}
-          y={24 + Math.min(customLogoSize, 90) + 42}
-          width={476}
-          fontSize={13}
-          letterSpacing={1.1}
+          text={schoolSettings.schoolName}
+          x={38}
+          y={titleY}
+          width={464}
+          fontSize={titleFontSize}
+          lineHeight={1.08}
+          maxLines={2}
           weight={800}
+          role="heading"
+          family="Cinzel, Georgia, serif"
           anchor="middle"
-          fill={accent}
+          fill={ink}
         />
-      )}
+        {sessionVisible && (
+          <TextBlock
+            text={`STUDENT IDENTITY • SESSION ${student.session || schoolSettings.academicSession}`}
+            x={38}
+            y={sessionY}
+            width={464}
+            fontSize={12.5}
+            letterSpacing={1.0}
+            weight={800}
+            anchor="middle"
+            fill={accent}
+            maxLines={1}
+          />
+        )}
 
-      <line x1="60" y1="180" x2="480" y2="180" stroke={accent} strokeWidth="1.5" />
+        <line x1="60" y1={dividerY} x2="254" y2={dividerY} stroke={accent} strokeWidth="1.5" />
+        <polygon points={`270,${dividerY - 5} 276,${dividerY} 270,${dividerY + 5} 264,${dividerY}`} fill={accent} />
+        <line x1="286" y1={dividerY} x2="480" y2={dividerY} stroke={accent} strokeWidth="1.5" />
 
-      <rect x={270 - (customPhotoW / 2) - 4} y={192 - 4} width={customPhotoW + 8} height={(customPhotoH - 10) + 8} fill="none" stroke={accent} strokeWidth="2" />
-      <Photo student={student} x={270 - (customPhotoW / 2)} y={192} width={customPhotoW} height={customPhotoH - 10} radius={customPhotoR ?? 2} borderColor={ink} />
+        <rect x={270 - crestPhotoW / 2 - 4} y={photoY - 4} width={crestPhotoW + 8} height={crestPhotoH + 8} fill="none" stroke={accent} strokeWidth="2" />
+        <Photo student={student} x={270 - crestPhotoW / 2} y={photoY} width={crestPhotoW} height={crestPhotoH} radius={customPhotoR ?? 2} borderColor={ink} />
 
-      <TextBlock text={student.name} x={36} y={356} width={468} fontSize={studentNameSize} weight={800} role="heading" family="Playfair Display, Georgia, serif" anchor="middle" fill={ink} />
-      <IdentityMeta student={student} visibleFields={visibleFields} x={36} y={404} width={468} fill={ink} muted={muted} customLabels={cust?.customLabels} accentBg="#fefce8" />
-      {renderDetails(462, 36, 468, 230)}
-      {renderQrAndSignature('#cbd5e1', ink)}
-      {renderLightFooterInfo(ink, 774, 810)}
-    </>
-  );
+        <TextBlock
+          text={student.name}
+          x={36}
+          y={nameY}
+          width={468}
+          fontSize={Math.min(studentNameSize, 31)}
+          weight={800}
+          role="heading"
+          family="Playfair Display, Georgia, serif"
+          anchor="middle"
+          fill={ink}
+          maxLines={1}
+        />
+        <IdentityMeta
+          student={student}
+          visibleFields={visibleFields}
+          x={36}
+          y={metaY}
+          width={468}
+          fill={ink}
+          muted={muted}
+          customLabels={cust?.customLabels}
+          accentBg="#fefce8"
+        />
+        {renderDetails(detailsY, 36, 468, detailsH)}
+        {renderQrAndSignature('#cbd5e1', ink)}
+        {renderLightFooterInfo(ink, 774, 810)}
+      </>
+    );
+  };
 
   // Template 13: Montessori Sunshine & Teal
   const renderColorfulPrimary = () => (

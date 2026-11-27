@@ -41,7 +41,7 @@ export const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
     session: true,
     rollNo: true,
     classGrade: true,
-    bloodGroup: true,
+    bloodGroup: false,
     principalSignature: true,
     logo: true,
     schoolAddress: true,

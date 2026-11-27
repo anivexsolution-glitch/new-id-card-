@@ -1,9 +1,42 @@
 @import "tailwindcss";
 
+:root {
+  --bg-primary: #F5F6F7;
+  --bg-secondary: #F0F2F4;
+  --surface: #FFFFFF;
+  --brand-primary: #24364B;
+  --brand-primary-hover: #304A64;
+  --brand-secondary: #536477;
+  --brand-accent: #A77C50;
+  --text-main: #202B38;
+  --text-secondary: #75808C;
+  --border-color: #E3E7EB;
+  --status-success: #25845A;
+  --status-warning: #C18A38;
+  --status-danger: #C44949;
+}
+
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: 'Manrope', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
   }
+
+  button:not(:disabled),
+  a[href],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+.studio-grid-bg {
+  background-color: #F0F2F4;
+  background-image:
+    linear-gradient(to right, rgba(36, 54, 75, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(36, 54, 75, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 /* Print Specific Rules for CR80 ID Cards and A4 Multi-card Sheets */

@@ -174,6 +174,28 @@ function wrap(text: string, width: number, size: number, spacing: number) {
   return lines;
 }
 
+export function countTextLines(
+  text: string | number,
+  width: number,
+  fontSize = 20,
+  maxLines = 2,
+  letterSpacing = 0,
+  wideFactor = 1.08
+): { lineCount: number; effectiveSize: number } {
+  const value = String(text ?? '');
+  const effectiveWidth = width / wideFactor;
+  let size = fontSize;
+  let lines = wrap(value, effectiveWidth, size, letterSpacing);
+  while (lines.length > maxLines && size > Math.min(fontSize, 9.5)) {
+    size -= 0.5;
+    lines = wrap(value, effectiveWidth, size, letterSpacing);
+  }
+  return {
+    lineCount: Math.max(1, Math.min(lines.length, maxLines)),
+    effectiveSize: size,
+  };
+}
+
 export function TextBlock({
   text,
   x,
@@ -498,7 +520,6 @@ export function Details({
   const lblMother = customLabels?.motherName || "Mother's Name";
   const lblDob = customLabels?.dob || 'D.O.B.';
   const lblContact = customLabels?.contactNumber || 'Contact No.';
-  const lblConveyance = customLabels?.conveyance || 'Conveyance';
   const lblAddress = customLabels?.address || 'Address';
 
   const rows = [
@@ -506,12 +527,11 @@ export function Details({
     visibleFields.motherName !== false && student.motherName && [lblMother, student.motherName],
     visibleFields.dob !== false && student.dob && [lblDob, student.dob],
     visibleFields.contactNumber !== false && student.contactNumber && [lblContact, student.contactNumber],
-    visibleFields.conveyance !== false && student.conveyance && [lblConveyance, student.conveyance === 'Yes' ? 'Yes' : 'No'],
     visibleFields.address !== false && student.address && [lblAddress, student.address],
   ].filter(Boolean) as string[][];
 
   const rowCount = Math.ceil(rows.length / columns);
-  const step = Math.min(columns === 1 ? 38 : 62, height / Math.max(1, rowCount));
+  const step = Math.min(columns === 1 ? 42 : 64, height / Math.max(1, rowCount));
   const cellWidth = (width - (columns - 1) * 20) / columns;
   const lSize = labelFontSize || (columns === 2 ? 14 : 16.5);
   const vSize = valueFontSize || (columns === 2 ? 19.5 : 20.5);
@@ -521,9 +541,8 @@ export function Details({
       {rows.map(([label, value], i) => {
         const rx = x + (i % columns) * (cellWidth + 20);
         const ry = y + Math.floor(i / columns) * step;
-        const isConveyance = label === lblConveyance;
-        const valColor = isConveyance ? '#000000' : fill;
-        const valWeight = isConveyance ? 800 : 700;
+        const valColor = fill;
+        const valWeight = 700;
 
         if (columns === 2) {
           return (
@@ -611,17 +630,19 @@ export function IdentityMeta({
 }) {
   const lblClass = (customLabels?.classGrade || 'CLASS').toUpperCase();
   const lblRoll = (customLabels?.rollNo || 'ROLL NO.').toUpperCase();
-  const lblBlood = (customLabels?.bloodGroup || 'BLOOD').toUpperCase();
+  const lblConveyance = (customLabels?.conveyance || 'CONVEYANCE').toUpperCase();
+  const conveyanceValue = student.conveyance === 'Yes' ? 'Yes' : 'No';
 
   const fields = [
     visibleFields.classGrade !== false && student.classGrade && [lblClass, student.classGrade],
     visibleFields.rollNo !== false && student.rollNo && [lblRoll, student.rollNo],
-    visibleFields.bloodGroup !== false && student.bloodGroup && [lblBlood, student.bloodGroup],
+    visibleFields.conveyance !== false && [lblConveyance, conveyanceValue],
   ].filter(Boolean) as string[][];
 
   if (!fields.length) return null;
   const gap = 8;
   const cell = (width - gap * (fields.length - 1)) / fields.length;
+  const isCompactCell = cell < 115;
 
   return (
     <g>
@@ -636,9 +657,9 @@ export function IdentityMeta({
               text={label}
               x={cx + (accentBg ? 8 : 0)}
               y={y}
-              width={cell - (accentBg ? 14 : 6)}
-              fontSize={13}
-              letterSpacing={0.7}
+              width={cell - (accentBg ? 14 : 4)}
+              fontSize={isCompactCell ? 11 : 12.5}
+              letterSpacing={isCompactCell ? 0.3 : 0.6}
               weight={700}
               fill={muted}
               maxLines={1}
@@ -647,8 +668,8 @@ export function IdentityMeta({
               text={value}
               x={cx + (accentBg ? 8 : 0)}
               y={y + 16}
-              width={cell - (accentBg ? 14 : 6)}
-              fontSize={20}
+              width={cell - (accentBg ? 14 : 4)}
+              fontSize={isCompactCell ? 18 : 20}
               weight={800}
               fill={fill}
               maxLines={1}
@@ -671,7 +692,6 @@ export function buildStudentQrPayload(student: Student, schoolSettings?: SchoolS
     student.dob ? `DOB: ${student.dob}` : '',
     student.contactNumber ? `Phone: ${student.contactNumber}` : '',
     `Conveyance: ${student.conveyance === 'Yes' ? 'Yes' : 'No'}`,
-    student.bloodGroup ? `Blood: ${student.bloodGroup}` : '',
     `Session: ${student.session || schoolSettings?.academicSession || ''}`,
     student.address ? `Address: ${student.address}` : '',
     schoolSettings?.schoolName ? `School: ${schoolSettings.schoolName}` : '',

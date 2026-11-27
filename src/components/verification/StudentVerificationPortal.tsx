@@ -140,11 +140,9 @@ export const StudentVerificationPortal: React.FC<StudentVerificationPortalProps>
                       Roll: {student.rollNo}
                     </span>
                   )}
-                  {student.bloodGroup && (
-                    <span className="bg-rose-50 text-rose-800 px-2 py-0.5 rounded font-semibold border border-rose-200">
-                      {student.bloodGroup}
-                    </span>
-                  )}
+                  <span className="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-800 border border-slate-200">
+                    Conveyance: {student.conveyance === 'Yes' ? 'Yes' : 'No'}
+                  </span>
                 </div>
               </div>
             </div>

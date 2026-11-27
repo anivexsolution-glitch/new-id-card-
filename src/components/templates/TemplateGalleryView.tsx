@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActiveNavTab, SchoolSettings, Student, TemplateDefinition, TemplateId } from '../../types';
 import { TEMPLATE_REGISTRY, DEMO_STUDENTS } from '../../constants/initialData';
 import { CR80Card } from '../cards/CR80Card';
-import { ArrowUpRight, Check, Eye, Sliders, X } from 'lucide-react';
+import { PageHeader, EmptyState } from '../ui/EnterpriseUI';
+import { ArrowUpRight, Check, Eye, Search, Sliders, X, Layers } from 'lucide-react';
 
 interface TemplateGalleryViewProps {
   schoolSettings: SchoolSettings;
@@ -13,28 +14,49 @@ interface TemplateGalleryViewProps {
 }
 
 const styleLabels: Record<string, string> = {
-  All: 'All styles',
+  All: 'All Categories',
   'Curved Academic': 'Curved Academic',
-  Institutional: 'Academic',
+  Institutional: 'Institutional',
   Heritage: 'Heritage',
-  'Geometric Modern': 'Contemporary',
+  'Geometric Modern': 'Geometric Modern',
   Minimal: 'Minimal',
 };
 
 export const TemplateGalleryView: React.FC<TemplateGalleryViewProps> = ({
-  schoolSettings, students, onSetDefaultTemplate, onNavigate, onSelectTemplateForEditor,
+  schoolSettings,
+  students,
+  onSetDefaultTemplate,
+  onNavigate,
+  onSelectTemplateForEditor,
 }) => {
-  const [activeOrientation, setActiveOrientation] = useState<'all' | 'portrait' | 'landscape'>('portrait');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeOrientation, setActiveOrientation] = useState<'all' | 'portrait' | 'landscape'>('all');
   const [selectedSubCategory, setSelectedSubCategory] = useState('All');
+  const [cardPreviewSides, setCardPreviewSides] = useState<Record<string, 'front' | 'back'>>({});
   const [previewTemplate, setPreviewTemplate] = useState<TemplateDefinition | null>(null);
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front');
+
   const sampleStudent = useMemo(() => students[0] || DEMO_STUDENTS[0], [students]);
-  const currentTemplate = TEMPLATE_REGISTRY.find((template) => template.id === schoolSettings.defaultTemplateId);
-  const subCategories = ['All', ...new Set(TEMPLATE_REGISTRY.map((template) => template.subCategory))];
-  const filteredTemplates = TEMPLATE_REGISTRY.filter((template) =>
-    (activeOrientation === 'all' || template.orientation === activeOrientation) &&
-    (selectedSubCategory === 'All' || template.subCategory === selectedSubCategory)
+  const currentTemplate = TEMPLATE_REGISTRY.find(
+    (template) => template.id === schoolSettings.defaultTemplateId
   );
+  const subCategories = ['All', ...new Set(TEMPLATE_REGISTRY.map((template) => template.subCategory))];
+
+  const filteredTemplates = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return TEMPLATE_REGISTRY.filter((template) => {
+      const matchOrientation =
+        activeOrientation === 'all' || template.orientation === activeOrientation;
+      const matchCategory =
+        selectedSubCategory === 'All' || template.subCategory === selectedSubCategory;
+      const matchSearch =
+        !q ||
+        template.name.toLowerCase().includes(q) ||
+        template.subCategory.toLowerCase().includes(q) ||
+        template.description.toLowerCase().includes(q);
+      return matchOrientation && matchCategory && matchSearch;
+    });
+  }, [activeOrientation, selectedSubCategory, searchQuery]);
 
   useEffect(() => {
     if (!previewTemplate) return;
@@ -52,84 +74,261 @@ export const TemplateGalleryView: React.FC<TemplateGalleryViewProps> = ({
   };
 
   return (
-    <div className="min-h-full bg-[#f7f6f2] p-4 sm:p-8 lg:p-10">
-      <div className="max-w-7xl mx-auto">
-        <header className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-7 border-b border-[#dcded9]">
-          <div>
-            <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-[#707970] mb-3">The identity collection</p>
-            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-[#25332f]">School ID templates</h2>
-            <p className="text-sm text-[#6d756f] mt-3 max-w-xl leading-relaxed">30 considered designs. Clear typography, balanced layouts and room for every student detail.</p>
-          </div>
-          <div className="border-l-2 border-[#a5b3a7] pl-4 shrink-0">
-            <p className="text-[10px] uppercase tracking-wider text-[#798078] mb-1">School default</p>
-            <p className="text-sm font-semibold text-[#34463d]">{currentTemplate?.name || 'Choose a template'}</p>
-          </div>
-        </header>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto space-y-6">
+      <PageHeader
+        title="ID Card Templates"
+        subtitle="Select a school default layout or open any template in the ID Card Studio to customize typography, branding, and fields."
+        meta={
+          <span>
+            Active default: <strong className="text-[#202B38]">{currentTemplate?.name || 'Custom'}</strong>
+          </span>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={() => openEditor(schoolSettings.defaultTemplateId)}
+            className="h-9 px-4 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg flex items-center gap-1.5 transition-colors"
+          >
+            <Sliders className="w-4 h-4" />
+            <span>Customize Active Design</span>
+          </button>
+        }
+      />
 
-        <div className="py-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-1 bg-[#eaece6] rounded-lg p-1 self-start" aria-label="Card orientation">
-            {(['portrait', 'landscape', 'all'] as const).map((orientation) => {
-              const count = TEMPLATE_REGISTRY.filter((template) => orientation === 'all' || template.orientation === orientation).length;
+      {/* Search, Orientation & Category Filter Toolbar */}
+      <div className="bg-white border border-[#E3E7EB] rounded-[10px] p-4 space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-[#75808C] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search templates by name, style, or description..."
+              aria-label="Search templates"
+              className="w-full h-9 pl-9 pr-3 text-xs rounded-lg border border-[#E3E7EB] bg-[#F5F6F7] text-[#202B38] placeholder:text-[#75808C] focus:outline-none focus:bg-white focus:border-[#24364B]"
+            />
+          </div>
+
+          {/* Orientation Segmented Filter */}
+          <div
+            className="flex flex-wrap items-center gap-1 bg-[#F0F2F4] rounded-lg p-1 self-start lg:self-auto"
+            role="group"
+            aria-label="Orientation Filter"
+          >
+            {(['all', 'portrait', 'landscape'] as const).map((orientation) => {
+              const count = TEMPLATE_REGISTRY.filter(
+                (t) => orientation === 'all' || t.orientation === orientation
+              ).length;
               return (
-                <button key={orientation} onClick={() => setActiveOrientation(orientation)} aria-pressed={activeOrientation === orientation}
-                  className={`px-3 sm:px-4 py-2 text-xs font-medium rounded-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#34463d] ${activeOrientation === orientation ? 'bg-white text-[#25332f] shadow-sm' : 'text-[#707970] hover:text-[#25332f]'}`}>
-                  {orientation === 'all' ? 'All designs' : orientation === 'portrait' ? 'Portrait' : 'Landscape'}
-                  <span className="ml-2 opacity-50 tabular-nums">{count}</span>
+                <button
+                  key={orientation}
+                  type="button"
+                  onClick={() => setActiveOrientation(orientation)}
+                  aria-pressed={activeOrientation === orientation}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                    activeOrientation === orientation
+                      ? 'bg-white text-[#202B38] font-semibold shadow-xs'
+                      : 'text-[#536477] hover:text-[#202B38]'
+                  }`}
+                >
+                  {orientation === 'all'
+                    ? 'All Designs'
+                    : orientation === 'portrait'
+                    ? 'Portrait'
+                    : 'Landscape'}{' '}
+                  <span className="ml-1 text-[#75808C] tabular-nums">{count}</span>
                 </button>
               );
             })}
           </div>
-          <div className="flex flex-wrap items-center gap-1" aria-label="Design style">
+        </div>
+
+        {/* Category Filter Buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E3E7EB]">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Category Filter">
             {subCategories.map((category) => (
-              <button key={category} onClick={() => setSelectedSubCategory(category)} aria-pressed={selectedSubCategory === category}
-                className={`px-3 py-2 text-xs rounded-md transition-colors focus-visible:outline-2 focus-visible:outline-[#34463d] ${selectedSubCategory === category ? 'text-[#25332f] bg-[#e5e9e1] font-semibold' : 'text-[#737b74] hover:text-[#25332f] hover:bg-[#eeefe9]'}`}>
+              <button
+                key={category}
+                type="button"
+                onClick={() => setSelectedSubCategory(category)}
+                aria-pressed={selectedSubCategory === category}
+                className={`px-3 py-1.5 text-xs rounded-lg transition-colors whitespace-nowrap ${
+                  selectedSubCategory === category
+                    ? 'bg-[#24364B] text-white font-semibold'
+                    : 'bg-[#F5F6F7] text-[#536477] hover:bg-[#F0F2F4] hover:text-[#202B38]'
+                }`}
+              >
                 {styleLabels[category] || category}
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="flex items-center justify-between mb-4 text-[11px] text-[#7a827b]">
-          <span>{filteredTemplates.length} designs in this collection</span>
-          <span>CR80 · 85.60 × 53.98 mm</span>
+          <span className="text-xs text-[#75808C] font-mono tabular-nums">
+            Showing {filteredTemplates.length} of {TEMPLATE_REGISTRY.length} · CR80
+          </span>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 lg:gap-6">
+      {/* Template Grid */}
+      {filteredTemplates.length === 0 ? (
+        <EmptyState
+          icon={<Layers className="w-5 h-5" />}
+          title="No matching templates"
+          description="Try clearing your search query or selecting another orientation and category filter."
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setActiveOrientation('all');
+                setSelectedSubCategory('All');
+              }}
+              className="h-9 px-4 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg"
+            >
+              Reset Filters
+            </button>
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredTemplates.map((template) => {
             const isCurrentDefault = schoolSettings.defaultTemplateId === template.id;
             const isPortrait = template.orientation === 'portrait';
-            const collectionNumber = String(TEMPLATE_REGISTRY.indexOf(template) + 1).padStart(2, '0');
+            const side = cardPreviewSides[template.id] || 'front';
+
             return (
-              <article key={template.id} className={`rounded-xl overflow-hidden bg-white border ${isCurrentDefault ? 'border-[#819684]' : 'border-[#dedfd9]'} flex flex-col`}>
-                <div className="px-5 pt-4 bg-[#eeeee8] flex items-center justify-between text-[10px] text-[#8a8d84] tracking-wider uppercase">
-                  <span>{collectionNumber} / {template.orientation}</span>
-                  {isCurrentDefault && <span className="flex items-center gap-1 text-[#526b59]"><Check className="w-3 h-3" />Selected</span>}
+              <article
+                key={template.id}
+                className={`bg-white rounded-[10px] border transition-colors flex flex-col overflow-hidden ${
+                  isCurrentDefault
+                    ? 'border-[#24364B] ring-1 ring-[#24364B]/20'
+                    : 'border-[#E3E7EB] hover:border-[#536477]/50'
+                }`}
+              >
+                {/* Clean Metadata Header */}
+                <div className="px-4 py-2.5 bg-[#F5F6F7] border-b border-[#E3E7EB] flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-[#75808C]">
+                    <span className="capitalize font-medium text-[#536477]">
+                      {template.orientation}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>{template.subCategory}</span>
+                  </div>
+
+                  {/* Quick Front / Back Thumbnail Toggle */}
+                  <div className="flex items-center gap-1 bg-white border border-[#E3E7EB] rounded-md p-0.5">
+                    {(['front', 'back'] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setCardPreviewSides((prev) => ({ ...prev, [template.id]: s }))}
+                        className={`px-2 py-0.5 text-[11px] font-medium rounded transition-colors ${
+                          side === s
+                            ? 'bg-[#24364B] text-white'
+                            : 'text-[#75808C] hover:text-[#202B38]'
+                        }`}
+                      >
+                        {s === 'front' ? 'Front' : 'Back'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <button type="button" onClick={() => { setPreviewTemplate(template); setPreviewSide('front'); }} aria-label={`Preview ${template.name}`}
-                  className={`w-full bg-[#eeeee8] px-6 pt-6 pb-8 flex justify-center items-center cursor-zoom-in focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#34463d] ${activeOrientation === 'all' || isPortrait ? 'min-h-[380px]' : 'min-h-[260px]'}`}>
-                  <div className={`w-full shadow-[0_8px_22px_rgba(40,50,43,0.11)] rounded-[6px] overflow-hidden ${isPortrait ? 'max-w-[210px]' : 'max-w-[320px]'}`}>
-                    <CR80Card student={sampleStudent} schoolSettings={schoolSettings} customization={{ templateId: template.id, orientation: template.orientation, side: 'front' }} />
+
+                {/* Consistent Card Preview Stage */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewTemplate(template);
+                    setPreviewSide(side);
+                  }}
+                  aria-label={`Inspect ${template.name}`}
+                  className="w-full bg-[#F0F2F4] px-6 py-6 flex items-center justify-center h-[320px] cursor-zoom-in focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#24364B]"
+                >
+                  <div
+                    className={`w-full shadow-md rounded-[6px] overflow-hidden ${
+                      isPortrait ? 'max-w-[178px]' : 'max-w-[300px]'
+                    }`}
+                  >
+                    <CR80Card
+                      student={sampleStudent}
+                      schoolSettings={schoolSettings}
+                      customization={{
+                        templateId: template.id,
+                        orientation: template.orientation,
+                        side,
+                      }}
+                    />
                   </div>
                 </button>
-                <div className="p-5 flex flex-col flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[9px] uppercase tracking-[0.13em] text-[#8b9189] mb-1.5">{styleLabels[template.subCategory] || template.subCategory}</p>
-                      <h3 className="font-semibold text-[16px] tracking-tight leading-tight text-[#293a32]">{template.name}</h3>
+
+                {/* Card Details & Actions */}
+                <div className="p-4 flex flex-col flex-1 justify-between gap-4">
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-bold text-[#202B38] truncate">
+                        {template.name}
+                      </h3>
+                      <div className="flex items-center gap-1 shrink-0" aria-hidden="true">
+                        {[template.primaryColor, template.accentColor].map((color, i) => (
+                          <span
+                            key={i}
+                            className="w-3 h-3 rounded-full border border-black/10"
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 mt-1" aria-label="Template palette">
-                      {[template.primaryColor, template.accentColor, template.surfaceColor].map((color, index) => <span key={index} className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: color }} />)}
-                    </div>
+                    <p className="text-xs text-[#75808C] mt-1 line-clamp-2 leading-relaxed">
+                      {template.description}
+                    </p>
                   </div>
-                  <p className="text-xs text-[#7a817a] leading-relaxed mt-2 min-h-[40px]">{template.description}</p>
-                  <div className="flex items-center justify-between gap-2 border-t border-[#eeeee9] pt-4 mt-4">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => { setPreviewTemplate(template); setPreviewSide('front'); }} className="flex items-center gap-1.5 py-1.5 pr-2 text-xs text-[#5e6d63] hover:text-[#263a2e]" aria-label={`Preview ${template.name}`}><Eye className="w-3.5 h-3.5" />Preview</button>
-                      <button onClick={() => openEditor(template.id)} className="p-1.5 text-[#7a857b] hover:text-[#263a2e] rounded hover:bg-[#f1f3ee]" title={`Customize ${template.name}`} aria-label={`Customize ${template.name}`}><Sliders className="w-3.5 h-3.5" /></button>
+
+                  <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#E3E7EB]">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewTemplate(template);
+                          setPreviewSide(side);
+                        }}
+                        className="px-2.5 py-1.5 text-xs font-medium text-[#536477] hover:text-[#202B38] hover:bg-[#F0F2F4] rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Preview</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEditor(template.id)}
+                        className="px-2.5 py-1.5 text-xs font-medium text-[#536477] hover:text-[#202B38] hover:bg-[#F0F2F4] rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        <Sliders className="w-3.5 h-3.5" />
+                        <span>Studio</span>
+                      </button>
                     </div>
-                    <button onClick={() => onSetDefaultTemplate(template.id)} disabled={isCurrentDefault}
-                      className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium rounded-md transition-colors ${isCurrentDefault ? 'bg-[#edf2e9] text-[#62765e]' : 'bg-[#34493d] text-white hover:bg-[#253a2e]'}`}>
-                      {isCurrentDefault ? <><Check className="w-3 h-3" />Current default</> : <>Use design<ArrowUpRight className="w-3 h-3" /></>}
+
+                    <button
+                      type="button"
+                      onClick={() => onSetDefaultTemplate(template.id)}
+                      disabled={isCurrentDefault}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors ${
+                        isCurrentDefault
+                          ? 'bg-[#25845A]/10 text-[#25845A] cursor-default'
+                          : 'bg-[#24364B] text-white hover:bg-[#304A64]'
+                      }`}
+                    >
+                      {isCurrentDefault ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Default</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Use Design</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -137,30 +336,100 @@ export const TemplateGalleryView: React.FC<TemplateGalleryViewProps> = ({
             );
           })}
         </div>
-        {!filteredTemplates.length && <div className="text-center text-sm text-[#7a817a] py-16 border border-dashed border-[#d7dcd3] rounded-xl">No designs match these filters. Choose another style or orientation.</div>}
-      </div>
+      )}
 
+      {/* Full Front / Back Inspection Modal */}
       {previewTemplate && (
-        <div className="fixed inset-0 z-50 bg-[#19281f]/60 flex items-center justify-center p-4" onClick={() => setPreviewTemplate(null)}>
-          <section role="dialog" aria-modal="true" aria-labelledby="template-preview-title" className="bg-[#fbfcf8] rounded-xl shadow-2xl border border-[#dce1d7] w-full max-w-xl max-h-[95vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
-            <div className="px-6 py-5 flex items-center justify-between border-b border-[#e1e4dc]">
+        <div
+          className="fixed inset-0 z-50 bg-[#202B38]/50 flex items-center justify-center p-4"
+          onClick={() => setPreviewTemplate(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="template-preview-title"
+            className="bg-white rounded-[12px] shadow-xl border border-[#E3E7EB] w-full max-w-xl max-h-[95vh] overflow-y-auto"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-6 py-4 flex items-center justify-between border-b border-[#E3E7EB] bg-[#F5F6F7]">
               <div>
-                <h3 id="template-preview-title" className="text-lg font-semibold tracking-tight text-[#2b3d30]">{previewTemplate.name}</h3>
-                <p className="text-[11px] text-[#7a8377] mt-1">{previewTemplate.orientation === 'portrait' ? 'Portrait · 53.98 × 85.60 mm' : 'Landscape · 85.60 × 53.98 mm'} · CR80</p>
+                <h3 id="template-preview-title" className="text-base font-bold text-[#202B38]">
+                  {previewTemplate.name}
+                </h3>
+                <p className="text-xs text-[#75808C] mt-0.5">
+                  {previewTemplate.orientation === 'portrait'
+                    ? 'Portrait · 53.98 × 85.60 mm'
+                    : 'Landscape · 85.60 × 53.98 mm'}{' '}
+                  · {previewTemplate.subCategory}
+                </p>
               </div>
-              <button autoFocus onClick={() => setPreviewTemplate(null)} className="p-2 rounded-md text-[#8a9286] hover:text-[#34493d] hover:bg-[#edf1e8]" aria-label="Close preview"><X className="w-5 h-5" /></button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setPreviewTemplate(null)}
+                aria-label="Close preview"
+                className="p-1.5 rounded-lg text-[#75808C] hover:text-[#202B38] hover:bg-[#E3E7EB]/60"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <div className="px-8 py-7 bg-[#eeeee8] flex flex-col items-center justify-center">
-              <div className={`w-full rounded-[7px] overflow-hidden shadow-[0_12px_32px_rgba(40,50,43,0.15)] ${previewTemplate.orientation === 'portrait' ? 'max-w-[260px]' : 'max-w-[440px]'}`}>
-                <CR80Card student={sampleStudent} schoolSettings={schoolSettings} customization={{ templateId: previewTemplate.id, orientation: previewTemplate.orientation, side: previewSide }} />
+
+            <div className="p-6 bg-[#F0F2F4] flex flex-col items-center justify-center">
+              <div
+                className={`w-full rounded-[8px] overflow-hidden shadow-lg ${
+                  previewTemplate.orientation === 'portrait' ? 'max-w-[260px]' : 'max-w-[440px]'
+                }`}
+              >
+                <CR80Card
+                  student={sampleStudent}
+                  schoolSettings={schoolSettings}
+                  customization={{
+                    templateId: previewTemplate.id,
+                    orientation: previewTemplate.orientation,
+                    side: previewSide,
+                  }}
+                />
               </div>
-              <div className="mt-6 p-1 bg-white rounded-md flex gap-1 border border-[#dfe3d9]" aria-label="Card side">
-                {(['front', 'back'] as const).map((side) => <button key={side} onClick={() => setPreviewSide(side)} aria-pressed={previewSide === side} className={`px-5 py-1.5 text-xs rounded ${previewSide === side ? 'bg-[#34493d] text-white' : 'text-[#727e6e] hover:bg-[#f0f3eb]'}`}>{side === 'front' ? 'Front' : 'Back'}</button>)}
+
+              <div className="mt-5 p-1 bg-white rounded-lg flex gap-1 border border-[#E3E7EB]">
+                {(['front', 'back'] as const).map((side) => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setPreviewSide(side)}
+                    aria-pressed={previewSide === side}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      previewSide === side
+                        ? 'bg-[#24364B] text-white'
+                        : 'text-[#536477] hover:text-[#202B38]'
+                    }`}
+                  >
+                    {side === 'front' ? 'Front Side' : 'Back Side'}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="px-6 py-5 flex flex-wrap gap-3 items-center justify-between">
-              <button onClick={() => openEditor(previewTemplate.id)} className="text-xs font-medium text-[#5b7159] hover:text-[#2b412c] flex items-center gap-2"><Sliders className="w-3.5 h-3.5" />Customize this design</button>
-              <button onClick={() => { onSetDefaultTemplate(previewTemplate.id); setPreviewTemplate(null); }} className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-white bg-[#34493d] hover:bg-[#263a2e] rounded-md"><Check className="w-3.5 h-3.5" />Use design</button>
+
+            <div className="px-6 py-4 border-t border-[#E3E7EB] flex flex-wrap gap-3 items-center justify-between bg-white">
+              <button
+                type="button"
+                onClick={() => openEditor(previewTemplate.id)}
+                className="text-xs font-semibold text-[#24364B] hover:underline flex items-center gap-1.5"
+              >
+                <Sliders className="w-3.5 h-3.5 text-[#A77C50]" />
+                <span>Open in ID Card Studio</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSetDefaultTemplate(previewTemplate.id);
+                  setPreviewTemplate(null);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Set as School Default</span>
+              </button>
             </div>
           </section>
         </div>

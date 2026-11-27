@@ -1,33 +1,35 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { ActiveNavTab, SchoolSettings, Student } from '../../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { ActiveNavTab, ExportHistoryRecord, SchoolSettings, Student } from '../../types';
 import { CR80Card } from '../cards/CR80Card';
 import { exportElementAsPng, exportSingleCardPdf } from '../../utils/export';
 import { BulkPhotoZipModal } from '../import/BulkPhotoZipModal';
+import { CardSurface, EmptyState, PageHeader, StatusText } from '../ui/EnterpriseUI';
 import {
   Search,
   Plus,
   Trash2,
   CheckCircle2,
-  Clock,
   Eye,
   Sliders,
   Download,
   X,
   FileSpreadsheet,
-  Bus,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   Upload,
   FileArchive,
-  GraduationCap,
   Printer,
-  Sparkles,
+  ChevronDown,
+  MoreHorizontal,
+  Users,
+  Edit3,
 } from 'lucide-react';
 
 interface StudentsViewProps {
   students: Student[];
   schoolSettings: SchoolSettings;
+  isLoading?: boolean;
   onOpenAddModal: () => void;
   onEditStudent: (student: Student) => void;
   onDeleteStudent: (studentId: string) => void;
@@ -38,11 +40,27 @@ interface StudentsViewProps {
   onSelectStudentForEditor: (studentId: string) => void;
   onUpdateStudentPhoto?: (studentId: string, photoUrl: string) => void;
   onUpdateStudentsBulk?: (students: Student[]) => void;
+  onLogExport?: (entry: Omit<ExportHistoryRecord, 'id' | 'timestamp'>) => void;
+}
+
+function parseClassAndSection(classGrade?: string): { className: string; section: string } {
+  const raw = (classGrade || 'Unassigned').trim();
+  const dashIdx = raw.indexOf('-');
+  if (dashIdx === -1) {
+    return { className: raw, section: '—' };
+  }
+  const left = raw.slice(0, dashIdx).trim() || 'Unassigned';
+  const right = raw
+    .slice(dashIdx + 1)
+    .replace(/section/i, '')
+    .trim();
+  return { className: left, section: right || '—' };
 }
 
 export const StudentsView: React.FC<StudentsViewProps> = ({
   students,
   schoolSettings,
+  isLoading = false,
   onOpenAddModal,
   onEditStudent,
   onDeleteStudent,
@@ -53,94 +71,113 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   onSelectStudentForEditor,
   onUpdateStudentPhoto,
   onUpdateStudentsBulk,
+  onLogExport,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [classFilter, setClassFilter] = useState<string>('all');
+  const [sectionFilter, setSectionFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'generated' | 'pending' | 'missing_photo'>('all');
   const [conveyanceFilter, setConveyanceFilter] = useState<'all' | 'Yes' | 'No'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'generated' | 'pending'>('all');
-  const [sortField, setSortField] = useState<'name' | 'rollNo' | 'classGrade' | 'id'>('name');
+  const [sortField, setSortField] = useState<'name' | 'rollNo' | 'classGrade'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [classFilter, setClassFilter] = useState<string>('all');
-  const [isZipModalOpen, setIsZipModalOpen] = useState<boolean>(false);
+  const [isZipModalOpen, setIsZipModalOpen] = useState(false);
+  const [isSecondaryMenuOpen, setIsSecondaryMenuOpen] = useState(false);
+  const secondaryMenuRef = useRef<HTMLDivElement>(null);
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
 
-  // Preview Modal State
   const [previewStudent, setPreviewStudent] = useState<Student | null>(null);
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front');
   const [isExporting, setIsExporting] = useState(false);
   const cardPreviewRef = useRef<HTMLDivElement>(null);
 
-  // Class list with card generation metrics
-  const classList = useMemo(() => {
-    const classMap = new Map<string, { total: number; generated: number }>();
-    students.forEach((s) => {
-      const cls = (s.classGrade || 'Unassigned').trim();
-      const curr = classMap.get(cls) || { total: 0, generated: 0 };
-      curr.total += 1;
-      if (s.isCardGenerated) curr.generated += 1;
-      classMap.set(cls, curr);
-    });
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (secondaryMenuRef.current && !secondaryMenuRef.current.contains(e.target as Node)) {
+        setIsSecondaryMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
 
-    return Array.from(classMap.entries())
-      .map(([name, stats]) => ({
-        name,
-        total: stats.total,
-        generated: stats.generated,
-        pending: stats.total - stats.generated,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  // Derive unique Class & Section options from live data
+  const { classOptions, sectionOptions } = useMemo(() => {
+    const clsSet = new Set<string>();
+    const secSet = new Set<string>();
+    students.forEach((s) => {
+      const { className, section } = parseClassAndSection(s.classGrade);
+      clsSet.add(className);
+      if (section !== '—') secSet.add(section);
+    });
+    return {
+      classOptions: Array.from(clsSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      sectionOptions: Array.from(secSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    };
   }, [students]);
 
-  // Filtered & Sorted Students
   const filteredStudents = useMemo(() => {
-    let result = students.filter((s) => {
-      const q = searchQuery.toLowerCase().trim();
+    const q = searchQuery.toLowerCase().trim();
+    const result = students.filter((s) => {
+      const { className, section } = parseClassAndSection(s.classGrade);
+
       const matchSearch =
         !q ||
         s.name.toLowerCase().includes(q) ||
         (s.rollNo && s.rollNo.toLowerCase().includes(q)) ||
         (s.fatherName && s.fatherName.toLowerCase().includes(q)) ||
-        s.contactNumber.includes(q) ||
-        (s.classGrade && s.classGrade.toLowerCase().includes(q));
+        s.contactNumber.toLowerCase().includes(q) ||
+        (s.classGrade && s.classGrade.toLowerCase().includes(q)) ||
+        (s.idCardNumber && s.idCardNumber.toLowerCase().includes(q));
 
-      const matchConveyance =
-        conveyanceFilter === 'all' || s.conveyance === conveyanceFilter;
+      const matchClass = classFilter === 'all' || className === classFilter;
+      const matchSection = sectionFilter === 'all' || section === sectionFilter;
+      const matchConveyance = conveyanceFilter === 'all' || s.conveyance === conveyanceFilter;
 
       const matchStatus =
         statusFilter === 'all' ||
         (statusFilter === 'generated' && s.isCardGenerated) ||
-        (statusFilter === 'pending' && !s.isCardGenerated);
+        (statusFilter === 'pending' && !s.isCardGenerated) ||
+        (statusFilter === 'missing_photo' && !s.photoUrl);
 
-      const matchClass =
-        classFilter === 'all' || (s.classGrade || 'Unassigned').trim() === classFilter;
-
-      return matchSearch && matchConveyance && matchStatus && matchClass;
+      return matchSearch && matchClass && matchSection && matchConveyance && matchStatus;
     });
 
-    // Sorting
     result.sort((a, b) => {
-      let valA = String(a[sortField] || '').toLowerCase();
-      let valB = String(b[sortField] || '').toLowerCase();
-      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+      const valA = String(a[sortField] || '').toLowerCase();
+      const valB = String(b[sortField] || '').toLowerCase();
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true });
+      return sortOrder === 'asc' ? cmp : -cmp;
     });
 
     return result;
-  }, [students, searchQuery, conveyanceFilter, statusFilter, classFilter, sortField, sortOrder]);
+  }, [
+    students,
+    searchQuery,
+    classFilter,
+    sectionFilter,
+    conveyanceFilter,
+    statusFilter,
+    sortField,
+    sortOrder,
+  ]);
 
-  // Paginated chunk
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedStudents = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safePage - 1) * pageSize;
     return filteredStudents.slice(start, start + pageSize);
-  }, [filteredStudents, currentPage, pageSize]);
+  }, [filteredStudents, safePage, pageSize]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
+  const generatedCount = useMemo(
+    () => students.filter((s) => s.isCardGenerated).length,
+    [students]
+  );
+
+  const handleSelectAllFiltered = (checked: boolean) => {
+    if (checked) {
       setSelectedIds(filteredStudents.map((s) => s.id));
     } else {
       setSelectedIds([]);
@@ -153,7 +190,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     );
   };
 
-  const handleSort = (field: 'name' | 'rollNo' | 'classGrade' | 'id') => {
+  const handleSort = (field: 'name' | 'rollNo' | 'classGrade') => {
     if (sortField === field) {
       setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -190,25 +227,42 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
       s.isCardGenerated ? 'Generated' : 'Pending',
     ]);
 
+    const fileName = `Student_Roster_${Date.now()}.csv`;
     const csvContent =
       'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(','))].join('\n');
+      [
+        headers.join(','),
+        ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')),
+      ].join('\n');
     const link = document.createElement('a');
     link.href = encodeURI(csvContent);
-    link.download = `School_Student_Roster_${Date.now()}.csv`;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    onLogExport?.({
+      format: 'CSV',
+      fileName,
+      cardCount: filteredStudents.length,
+      templateName: 'Student Roster Export',
+      orientation: schoolSettings.defaultOrientation,
+    });
   };
 
   const handleExportPng = async () => {
     if (!cardPreviewRef.current || !previewStudent) return;
     setIsExporting(true);
+    const fileName = `ID_Card_${previewStudent.name.replace(/\s+/g, '_')}_${previewSide}.png`;
     try {
-      await exportElementAsPng(
-        cardPreviewRef.current,
-        `ID_Card_${previewStudent.name.replace(/\s+/g, '_')}_${previewSide}.png`
-      );
+      await exportElementAsPng(cardPreviewRef.current, fileName);
+      onLogExport?.({
+        format: 'PNG',
+        fileName,
+        cardCount: 1,
+        templateName: schoolSettings.defaultTemplateId,
+        orientation: schoolSettings.defaultOrientation,
+      });
     } catch (e) {
       console.error(e);
     } finally {
@@ -219,12 +273,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const handleExportPdf = async () => {
     if (!cardPreviewRef.current || !previewStudent) return;
     setIsExporting(true);
+    const fileName = `ID_Card_${previewStudent.name.replace(/\s+/g, '_')}.pdf`;
     try {
       await exportSingleCardPdf(
         cardPreviewRef.current,
         previewStudent.name,
         schoolSettings.defaultOrientation
       );
+      onLogExport?.({
+        format: 'CR80 PDF',
+        fileName,
+        cardCount: 1,
+        templateName: schoolSettings.defaultTemplateId,
+        orientation: schoolSettings.defaultOrientation,
+      });
     } catch (e) {
       console.error(e);
     } finally {
@@ -243,500 +305,671 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     }
   };
 
+  const clearFilters = () => {
+    setSearchQuery('');
+    setClassFilter('all');
+    setSectionFilter('all');
+    setStatusFilter('all');
+    setConveyanceFilter('all');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    classFilter !== 'all' ||
+    sectionFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    conveyanceFilter !== 'all';
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Title & Actions Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Student Directory</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Full management of Indian school student records, parent dossiers, and CR80 card generation.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setIsZipModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors shadow-xs"
-            title="Upload student photos in bulk via ZIP archive"
-          >
-            <FileArchive className="w-3.5 h-3.5 text-blue-600" />
-            <span>Bulk Photo ZIP</span>
-          </button>
-
-          <button
-            onClick={handleDownloadCsv}
-            disabled={filteredStudents.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate && onNavigate('import')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
-            <span>Import Excel</span>
-          </button>
-
-          <button
-            onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Student</span>
-          </button>
-        </div>
-      </div>
-
-      {/* CLASS-WISE ID CARD SYSTEM TABS */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Class-Wise ID Card System
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-500 font-medium">
-            {classList.length} Classes Enrolled · {students.filter((s) => s.isCardGenerated).length} / {students.length} Total Cards Ready
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-5">
+      <PageHeader
+        title="Students"
+        meta={
+          <span className="font-mono tabular-nums">
+            {students.length} enrolled · {generatedCount} cards ready
           </span>
-        </div>
-
-        {/* Scrollable Class Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-          <button
-            onClick={() => {
-              setClassFilter('all');
-              setCurrentPage(1);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all ${
-              classFilter === 'all'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            All Classes ({students.length})
-          </button>
-
-          {classList.map((cls) => {
-            const isSelected = classFilter === cls.name;
-            const isAllGenerated = cls.total > 0 && cls.generated === cls.total;
-
-            return (
+        }
+        subtitle="Manage enrolled student records, parent contact details, portraits, and ID card readiness."
+        actions={
+          <>
+            {/* Secondary actions organized in contextual toolbar + dropdown */}
+            <div className="relative" ref={secondaryMenuRef}>
               <button
-                key={cls.name}
-                onClick={() => {
-                  setClassFilter(cls.name);
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs shrink-0 transition-all border ${
-                  isSelected
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-bold'
-                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                }`}
+                type="button"
+                onClick={() => setIsSecondaryMenuOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#202B38] bg-white border border-[#E3E7EB] hover:bg-[#F0F2F4] rounded-lg transition-colors"
               >
-                <span>{cls.name}</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                    isSelected
-                      ? 'bg-blue-500 text-white'
-                      : isAllGenerated
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {cls.generated}/{cls.total}
-                </span>
+                <MoreHorizontal className="w-3.5 h-3.5 text-[#536477]" />
+                <span>Bulk Tools</span>
+                <ChevronDown className="w-3.5 h-3.5 text-[#75808C]" />
               </button>
-            );
-          })}
-        </div>
 
-        {/* Class-Specific Batch Action Bar if single class is active */}
-        {classFilter !== 'all' && (
-          <div className="mt-2 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-blue-950">Active Class: {classFilter}</span>
-              <span className="text-slate-500">·</span>
-              <span className="text-slate-600">
-                {filteredStudents.length} students ({filteredStudents.filter((s) => s.isCardGenerated).length} generated, {filteredStudents.filter((s) => !s.isCardGenerated).length} pending)
-              </span>
+              {isSecondaryMenuOpen && (
+                <div className="absolute right-0 mt-1.5 w-52 bg-white border border-[#E3E7EB] rounded-[10px] shadow-lg py-1.5 z-30">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSecondaryMenuOpen(false);
+                      onNavigate?.('import');
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#202B38] hover:bg-[#F5F6F7] flex items-center gap-2.5"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-[#536477]" />
+                    <span>Import Excel / CSV</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSecondaryMenuOpen(false);
+                      handleDownloadCsv();
+                    }}
+                    disabled={filteredStudents.length === 0}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#202B38] hover:bg-[#F5F6F7] disabled:opacity-40 flex items-center gap-2.5"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#536477]" />
+                    <span>Export CSV ({filteredStudents.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSecondaryMenuOpen(false);
+                      setIsZipModalOpen(true);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-[#202B38] hover:bg-[#F5F6F7] flex items-center gap-2.5"
+                  >
+                    <FileArchive className="w-3.5 h-3.5 text-[#536477]" />
+                    <span>Bulk Photo Upload (ZIP)</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const pendingIds = filteredStudents.filter((s) => !s.isCardGenerated).map((s) => s.id);
-                  if (pendingIds.length > 0 && onBulkGenerate) {
-                    onBulkGenerate(pendingIds);
-                  }
-                }}
-                disabled={filteredStudents.filter((s) => !s.isCardGenerated).length === 0}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 disabled:opacity-50 rounded-md transition-colors"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Generate All Cards for {classFilter}</span>
-              </button>
-
-              <button
-                onClick={() => onNavigate && onNavigate('export')}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-800 bg-white border border-slate-300 hover:bg-slate-50 rounded-md transition-colors shadow-xs"
-              >
-                <Printer className="w-3.5 h-3.5 text-slate-600" />
-                <span>Print {classFilter} Cards</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex-1 min-w-[260px] relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search by student name, contact number, roll number, father's name..."
-            className="w-full text-xs pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
-          />
-        </div>
-
-        {/* Filters */}
-        <div className="flex items-center gap-2">
-          {/* Conveyance Filter */}
-          <select
-            value={conveyanceFilter}
-            onChange={(e) => {
-              setConveyanceFilter(e.target.value as any);
-              setCurrentPage(1);
-            }}
-            className="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700"
-          >
-            <option value="all">All Conveyance</option>
-            <option value="Yes">Bus Pass (Yes)</option>
-            <option value="No">Private (No)</option>
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as any);
-              setCurrentPage(1);
-            }}
-            className="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-700"
-          >
-            <option value="all">All Card Statuses</option>
-            <option value="generated">Cards Generated</option>
-            <option value="pending">Pending Generation</option>
-          </select>
-
-          {/* Page Size */}
-          <select
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="text-xs px-2 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-mono"
-          >
-            <option value={10}>10 / page</option>
-            <option value={25}>25 / page</option>
-            <option value={50}>50 / page</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Batch Operations Bar (Visible when rows selected) */}
-      {selectedIds.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg flex items-center justify-between animate-in fade-in">
-          <span className="text-xs font-medium text-blue-900">
-            {selectedIds.length} of {filteredStudents.length} students selected
-          </span>
-          <div className="flex items-center gap-2">
             <button
-              onClick={() => onBulkGenerate && onBulkGenerate(selectedIds)}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+              type="button"
+              onClick={onOpenAddModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg transition-colors"
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Mark as Generated</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Student</span>
+            </button>
+          </>
+        }
+      />
+
+      {/* Search & Filters */}
+      <CardSurface padding="sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
+          <div className="lg:col-span-4 relative">
+            <Search className="w-3.5 h-3.5 text-[#75808C] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by name, roll number, or contact..."
+              className="w-full text-xs pl-8.5 pr-3 py-2 rounded-lg border border-[#E3E7EB] bg-[#F5F6F7]/60 text-[#202B38] placeholder:text-[#75808C] focus:outline-none focus:bg-white focus:border-[#24364B]"
+            />
+          </div>
+
+          <div className="lg:col-span-2">
+            <select
+              aria-label="Filter by Class"
+              value={classFilter}
+              onChange={(e) => {
+                setClassFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs px-2.5 py-2 rounded-lg border border-[#E3E7EB] bg-white text-[#202B38] focus:outline-none focus:border-[#24364B]"
+            >
+              <option value="all">All Classes</option>
+              {classOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="lg:col-span-2">
+            <select
+              aria-label="Filter by Section"
+              value={sectionFilter}
+              onChange={(e) => {
+                setSectionFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs px-2.5 py-2 rounded-lg border border-[#E3E7EB] bg-white text-[#202B38] focus:outline-none focus:border-[#24364B]"
+            >
+              <option value="all">All Sections</option>
+              {sectionOptions.map((sec) => (
+                <option key={sec} value={sec}>
+                  Section {sec}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="lg:col-span-2">
+            <select
+              aria-label="Filter by Status"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs px-2.5 py-2 rounded-lg border border-[#E3E7EB] bg-white text-[#202B38] focus:outline-none focus:border-[#24364B]"
+            >
+              <option value="all">All Statuses</option>
+              <option value="generated">Generated</option>
+              <option value="pending">Pending</option>
+              <option value="missing_photo">Missing Photo</option>
+            </select>
+          </div>
+
+          <div className="lg:col-span-2 flex items-center gap-2">
+            <select
+              aria-label="Filter by Conveyance"
+              value={conveyanceFilter}
+              onChange={(e) => {
+                setConveyanceFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs px-2.5 py-2 rounded-lg border border-[#E3E7EB] bg-white text-[#202B38] focus:outline-none focus:border-[#24364B]"
+            >
+              <option value="all">All Commute</option>
+              <option value="Yes">Bus Route</option>
+              <option value="No">Private</option>
+            </select>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                title="Reset filters"
+                className="p-2 rounded-lg border border-[#E3E7EB] text-[#75808C] hover:text-[#202B38] hover:bg-[#F0F2F4] shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </CardSurface>
+
+      {/* Contextual Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-[#24364B] text-white px-4 py-2.5 rounded-[10px] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold tabular-nums">
+              {selectedIds.length} of {filteredStudents.length} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-white/75 hover:text-white underline text-[11px]"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onBulkGenerate?.(selectedIds)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white text-[#24364B] hover:bg-[#F0F2F4] rounded-lg transition-colors"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#25845A]" />
+              <span>Mark Generated</span>
             </button>
             <button
+              type="button"
+              onClick={() => onNavigate?.('export')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#304A64] hover:bg-[#3d5c7a] text-white rounded-lg transition-colors"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Batch Print</span>
+            </button>
+            <button
+              type="button"
               onClick={() => {
-                if (confirm(`Are you sure you want to delete ${selectedIds.length} students?`)) {
-                  onBulkDelete && onBulkDelete(selectedIds);
+                if (confirm(`Delete ${selectedIds.length} selected student records?`)) {
+                  onBulkDelete?.(selectedIds);
                   setSelectedIds([]);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-md transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#C44949] hover:bg-[#a93b3b] text-white rounded-lg transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete Selected</span>
+              <span>Delete</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Student Data Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                <th className="py-3 px-3 w-10 text-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.length === filteredStudents.length && filteredStudents.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                </th>
-                <th
-                  onClick={() => handleSort('name')}
-                  className="py-3 px-3 cursor-pointer hover:text-blue-600 select-none"
-                >
-                  <div className="flex items-center gap-1">
-                    <span>Student Name</span>
-                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                  </div>
-                </th>
-                <th className="py-3 px-3">Parents' Names</th>
-                <th
-                  onClick={() => handleSort('classGrade')}
-                  className="py-3 px-3 cursor-pointer hover:text-blue-600 select-none"
-                >
-                  <div className="flex items-center gap-1">
-                    <span>Class & Roll</span>
-                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                  </div>
-                </th>
-                <th className="py-3 px-3">Contact</th>
-                <th className="py-3 px-3">D.O.B.</th>
-                <th className="py-3 px-3">Conveyance</th>
-                <th className="py-3 px-3 text-center">Card Status</th>
-                <th className="py-3 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginatedStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
-                    <p className="text-sm font-medium text-slate-600">No student records match your query.</p>
-                    <p className="text-xs text-slate-400 mt-1">Try clearing filters or importing an Excel roster.</p>
-                  </td>
-                </tr>
-              ) : (
-                paginatedStudents.map((student) => {
-                  const isSelected = selectedIds.includes(student.id);
-                  return (
-                    <tr
-                      key={student.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        isSelected ? 'bg-blue-50/40' : ''
-                      }`}
+      {/* Loading State */}
+      {isLoading ? (
+        <CardSurface padding="md" className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 rounded-lg bg-[#F0F2F4] animate-pulse" />
+          ))}
+        </CardSurface>
+      ) : filteredStudents.length === 0 ? (
+        <EmptyState
+          icon={<Users className="w-5 h-5" />}
+          title="No students match these filters"
+          description={
+            students.length === 0
+              ? 'Add students individually or upload an Excel/CSV roster to begin designing ID cards.'
+              : 'Try adjusting your search query, class, section, or status filter.'
+          }
+          action={
+            hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-3.5 py-2 text-xs font-semibold text-[#202B38] bg-white border border-[#E3E7EB] hover:bg-[#F0F2F4] rounded-lg"
+              >
+                Clear All Filters
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenAddModal}
+                className="px-4 py-2 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg"
+              >
+                Add First Student
+              </button>
+            )
+          }
+        />
+      ) : (
+        <>
+          {/* Desktop Student Table */}
+          <div className="hidden md:block bg-white border border-[#E3E7EB] rounded-[10px] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-[#F5F6F7] border-b border-[#E3E7EB] text-[11px] font-semibold uppercase tracking-wider text-[#75808C]">
+                    <th className="py-3 px-3.5 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={
+                          filteredStudents.length > 0 &&
+                          selectedIds.length === filteredStudents.length
+                        }
+                        onChange={(e) => handleSelectAllFiltered(e.target.checked)}
+                        className="rounded border-[#E3E7EB] accent-[#24364B] cursor-pointer"
+                      />
+                    </th>
+                    <th
+                      onClick={() => handleSort('name')}
+                      className="py-3 px-3.5 cursor-pointer hover:text-[#202B38] select-none"
                     >
-                      <td className="py-3 px-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleSelect(student.id)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        />
-                      </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="relative group w-8 h-8 shrink-0">
-                            {student.photoUrl ? (
-                              <img
-                                src={student.photoUrl}
-                                alt={student.name}
-                                className="w-8 h-8 rounded object-cover border border-slate-200"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
-                                <span className="text-[10px] font-bold">
-                                  {student.name.charAt(0)}
-                                </span>
-                              </div>
+                      <span className="inline-flex items-center gap-1">
+                        <span>Student</span>
+                        <ArrowUpDown className="w-3 h-3" />
+                      </span>
+                    </th>
+                    <th
+                      onClick={() => handleSort('rollNo')}
+                      className="py-3 px-3.5 cursor-pointer hover:text-[#202B38] select-none"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <span>Roll No</span>
+                        <ArrowUpDown className="w-3 h-3" />
+                      </span>
+                    </th>
+                    <th
+                      onClick={() => handleSort('classGrade')}
+                      className="py-3 px-3.5 cursor-pointer hover:text-[#202B38] select-none"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <span>Class</span>
+                        <ArrowUpDown className="w-3 h-3" />
+                      </span>
+                    </th>
+                    <th className="py-3 px-3.5">Section</th>
+                    <th className="py-3 px-3.5">Contact</th>
+                    <th className="py-3 px-3.5">Status</th>
+                    <th className="py-3 px-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E3E7EB]">
+                  {paginatedStudents.map((student) => {
+                    const isSelected = selectedIds.includes(student.id);
+                    const { className, section } = parseClassAndSection(student.classGrade);
+                    return (
+                      <tr
+                        key={student.id}
+                        className={`h-[60px] transition-colors ${
+                          isSelected ? 'bg-[#F0F2F4]' : 'hover:bg-[#F5F6F7]/70'
+                        }`}
+                      >
+                        <td className="px-3.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelect(student.id)}
+                            className="rounded border-[#E3E7EB] accent-[#24364B] cursor-pointer"
+                          />
+                        </td>
+                        <td className="px-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="relative group w-9 h-9 shrink-0">
+                              {student.photoUrl ? (
+                                <img
+                                  src={student.photoUrl}
+                                  alt={student.name}
+                                  className="w-9 h-9 rounded-lg object-cover border border-[#E3E7EB]"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-lg bg-[#F0F2F4] border border-[#E3E7EB] flex items-center justify-center text-[11px] font-bold text-[#536477]">
+                                  {student.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <label
+                                title="Upload portrait"
+                                className="absolute inset-0 bg-[#202B38]/60 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
+                              >
+                                <Upload className="w-3.5 h-3.5 text-white" />
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                                  onChange={(e) => handleDirectPhotoUpload(student.id, e)}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-[#202B38] truncate max-w-[190px]">
+                                {student.name}
+                              </p>
+                              <p className="text-[11px] text-[#75808C] truncate max-w-[190px]">
+                                F: {student.fatherName || '—'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3.5 font-mono tabular-nums text-[#202B38]">
+                          {student.rollNo || '—'}
+                        </td>
+                        <td className="px-3.5 font-medium text-[#202B38]">{className}</td>
+                        <td className="px-3.5 text-[#536477]">{section}</td>
+                        <td className="px-3.5">
+                          <p className="font-mono tabular-nums text-[#202B38] text-[11px]">
+                            {student.contactNumber}
+                          </p>
+                          <p className="text-[10px] text-[#75808C]">
+                            {student.conveyance === 'Yes' ? 'Bus Route' : 'Private'}
+                          </p>
+                        </td>
+                        <td className="px-3.5">
+                          <button
+                            type="button"
+                            onClick={() => onToggleCardGenerated(student.id)}
+                            title="Toggle generated status"
+                            className="text-left hover:opacity-80 transition-opacity"
+                          >
+                            <StatusText
+                              tone={student.isCardGenerated ? 'success' : 'warning'}
+                              label={student.isCardGenerated ? 'Generated' : 'Pending'}
+                            />
+                            {!student.photoUrl && (
+                              <span className="block text-[10px] font-medium text-[#C44949] mt-0.5">
+                                Missing photo
+                              </span>
                             )}
-                            <label
-                              title="Upload Photo"
-                              className="absolute inset-0 bg-black/40 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
+                          </button>
+                        </td>
+                        <td className="px-3.5 text-right">
+                          <div className="inline-flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewStudent(student);
+                                setPreviewSide('front');
+                              }}
+                              title="Preview ID card"
+                              className="p-1.5 rounded-lg text-[#536477] hover:text-[#24364B] hover:bg-[#F0F2F4] transition-colors"
                             >
-                              <Upload className="w-3.5 h-3.5 text-white" />
-                              <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/jpg,image/webp"
-                                onChange={(e) => handleDirectPhotoUpload(student.id, e)}
-                                className="hidden"
-                              />
-                            </label>
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectStudentForEditor(student.id);
+                                onNavigate?.('editor');
+                              }}
+                              title="Customize in ID Card Studio"
+                              className="p-1.5 rounded-lg text-[#536477] hover:text-[#24364B] hover:bg-[#F0F2F4] transition-colors"
+                            >
+                              <Sliders className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onEditStudent(student)}
+                              title="Edit student"
+                              className="p-1.5 rounded-lg text-[#536477] hover:text-[#24364B] hover:bg-[#F0F2F4] transition-colors"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Delete student record for ${student.name}?`)) {
+                                  onDeleteStudent(student.id);
+                                }
+                              }}
+                              title="Delete student"
+                              className="p-1.5 rounded-lg text-[#75808C] hover:text-[#C44949] hover:bg-[#F5F6F7] transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                          <div>
-                            <p className="font-semibold text-slate-900 leading-tight">{student.name}</p>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {student.idCardNumber || student.id}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-slate-600">
-                        <p className="truncate max-w-[150px]">F: {student.fatherName || '—'}</p>
-                        <p className="truncate max-w-[150px] text-[10px] text-slate-400">
-                          M: {student.motherName || '—'}
-                        </p>
-                      </td>
-                      <td className="py-3 px-3 text-slate-600">
-                        <span className="font-medium text-slate-800">{student.classGrade || 'Class X'}</span>
-                        <span className="block text-[10px] font-mono text-slate-400">
-                          Roll: {student.rollNo || '—'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 font-mono text-slate-700 text-[11px]">
-                        {student.contactNumber}
-                      </td>
-                      <td className="py-3 px-3 font-mono text-slate-600 text-[11px]">
-                        {student.dob}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
-                            student.conveyance === 'Yes'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}
-                        >
-                          <Bus className="w-3 h-3" />
-                          <span>{student.conveyance === 'Yes' ? 'Bus Route' : 'Private'}</span>
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          onClick={() => onToggleCardGenerated(student.id)}
-                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
-                            student.isCardGenerated
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                          }`}
-                        >
-                          {student.isCardGenerated ? 'Generated' : 'Pending'}
-                        </button>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setPreviewStudent(student);
-                              setPreviewSide('front');
-                            }}
-                            title="Preview ID Card"
-                            className="p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              onSelectStudentForEditor(student.id);
-                              onNavigate && onNavigate('editor');
-                            }}
-                            title="Customize Card"
-                            className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
-                          >
-                            <Sliders className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onEditStudent(student)}
-                            title="Edit Student Info"
-                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-1 py-0.5"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm(`Delete student record for ${student.name}?`)) {
-                                onDeleteStudent(student.id);
-                              }
-                            }}
-                            title="Delete Student"
-                            className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-        {/* Pagination Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
-          <div>
-            Showing {(currentPage - 1) * pageSize + 1} to{' '}
-            {Math.min(currentPage * pageSize, filteredStudents.length)} of {filteredStudents.length} students
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="p-1 rounded border border-slate-300 bg-white disabled:opacity-40 hover:bg-slate-50"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="font-mono text-slate-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="p-1 rounded border border-slate-300 bg-white disabled:opacity-40 hover:bg-slate-50"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Card Preview Modal */}
-      {previewStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+            {/* Pagination Footer */}
+            <div className="px-4 py-3 bg-[#F5F6F7] border-t border-[#E3E7EB] flex items-center justify-between text-xs text-[#536477]">
               <div className="flex items-center gap-3">
-                <h3 className="text-sm font-bold text-slate-900">
-                  {previewStudent.name} — CR80 Identity Card
-                </h3>
-                <span className="text-[10px] font-mono text-slate-500 uppercase">
-                  {schoolSettings.defaultOrientation}
+                <span className="tabular-nums">
+                  Showing {(safePage - 1) * pageSize + 1}–
+                  {Math.min(safePage * pageSize, filteredStudents.length)} of {filteredStudents.length}
                 </span>
+                <select
+                  aria-label="Rows per page"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs px-2 py-1 rounded border border-[#E3E7EB] bg-white text-[#202B38] font-mono"
+                >
+                  <option value={10}>10 / page</option>
+                  <option value={25}>25 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="p-1.5 rounded-lg border border-[#E3E7EB] bg-white disabled:opacity-40 hover:bg-[#F0F2F4]"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="font-mono tabular-nums text-[#202B38]">
+                  {safePage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="p-1.5 rounded-lg border border-[#E3E7EB] bg-white disabled:opacity-40 hover:bg-[#F0F2F4]"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Responsive Cards Layout */}
+          <div className="md:hidden space-y-3">
+            {paginatedStudents.map((student) => {
+              const isSelected = selectedIds.includes(student.id);
+              const { className, section } = parseClassAndSection(student.classGrade);
+              return (
+                <CardSurface key={student.id} padding="sm" className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelect(student.id)}
+                        className="rounded border-[#E3E7EB] accent-[#24364B] shrink-0"
+                      />
+                      {student.photoUrl ? (
+                        <img
+                          src={student.photoUrl}
+                          alt={student.name}
+                          className="w-10 h-10 rounded-lg object-cover border border-[#E3E7EB] shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-[#F0F2F4] border border-[#E3E7EB] flex items-center justify-center text-xs font-bold text-[#536477] shrink-0">
+                          {student.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#202B38] truncate">
+                          {student.name}
+                        </p>
+                        <p className="text-xs text-[#75808C] truncate">
+                          {className}
+                          {section !== '—' ? ` · Sec ${section}` : ''} · Roll {student.rollNo || '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onToggleCardGenerated(student.id)}
+                      className="shrink-0"
+                    >
+                      <StatusText
+                        tone={student.isCardGenerated ? 'success' : 'warning'}
+                        label={student.isCardGenerated ? 'Generated' : 'Pending'}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-[#536477] pt-2 border-t border-[#E3E7EB]">
+                    <span className="font-mono tabular-nums">{student.contactNumber}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewStudent(student);
+                          setPreviewSide('front');
+                        }}
+                        className="px-2.5 py-1 text-xs font-medium bg-[#F5F6F7] border border-[#E3E7EB] rounded-lg text-[#202B38]"
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectStudentForEditor(student.id);
+                          onNavigate?.('editor');
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold bg-[#24364B] text-white rounded-lg"
+                      >
+                        Studio
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onEditStudent(student)}
+                        className="p-1.5 border border-[#E3E7EB] rounded-lg text-[#536477]"
+                        aria-label="Edit student"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </CardSurface>
+              );
+            })}
+
+            {/* Mobile Pagination */}
+            <div className="flex items-center justify-between pt-2 text-xs text-[#536477]">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="px-3 py-1.5 rounded-lg border border-[#E3E7EB] bg-white disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="font-mono tabular-nums">
+                Page {safePage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="px-3 py-1.5 rounded-lg border border-[#E3E7EB] bg-white disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Student Card Preview Modal */}
+      {previewStudent && (
+        <div
+          className="no-print fixed inset-0 z-50 bg-[#202B38]/45 flex items-center justify-center p-4"
+          onClick={() => setPreviewStudent(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-white rounded-[12px] border border-[#E3E7EB] shadow-xl w-full max-w-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-3.5 border-b border-[#E3E7EB] flex items-center justify-between bg-[#F5F6F7]">
+              <div>
+                <h3 className="text-sm font-bold text-[#202B38]">
+                  {previewStudent.name} · CR80 Preview
+                </h3>
+                <p className="text-[11px] text-[#75808C] capitalize">
+                  {schoolSettings.defaultOrientation} orientation
+                </p>
               </div>
               <button
+                type="button"
                 onClick={() => setPreviewStudent(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors"
+                className="p-1.5 rounded-lg text-[#75808C] hover:text-[#202B38] hover:bg-[#E3E7EB]/60"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 bg-slate-100/60 flex flex-col items-center justify-center">
-              {/* Card Container for html2canvas export */}
+            <div className="p-6 studio-grid-bg flex flex-col items-center justify-center">
               <div
                 ref={cardPreviewRef}
-                className={`shadow-lg rounded-md overflow-hidden bg-white w-full ${
-                  schoolSettings.defaultOrientation === 'portrait' ? 'max-w-[280px]' : 'max-w-[400px]'
+                className={`rounded-md overflow-hidden bg-white w-full border border-[#E3E7EB] ${
+                  schoolSettings.defaultOrientation === 'portrait'
+                    ? 'max-w-[270px]'
+                    : 'max-w-[390px]'
                 }`}
               >
                 <CR80Card
@@ -750,21 +983,25 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 />
               </div>
 
-              {/* Front / Back Switcher */}
-              <div className="mt-4 flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs">
-                <span className="text-xs text-slate-500 font-medium">Card Side:</span>
+              <div className="mt-4 inline-flex items-center bg-white border border-[#E3E7EB] rounded-lg p-1 text-xs">
                 <button
+                  type="button"
                   onClick={() => setPreviewSide('front')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                    previewSide === 'front' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+                  className={`px-3 py-1 rounded-md font-semibold transition-colors ${
+                    previewSide === 'front'
+                      ? 'bg-[#24364B] text-white'
+                      : 'text-[#536477] hover:text-[#202B38]'
                   }`}
                 >
                   Front Side
                 </button>
                 <button
+                  type="button"
                   onClick={() => setPreviewSide('back')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                    previewSide === 'back' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+                  className={`px-3 py-1 rounded-md font-semibold transition-colors ${
+                    previewSide === 'back'
+                      ? 'bg-[#24364B] text-white'
+                      : 'text-[#536477] hover:text-[#202B38]'
                   }`}
                 >
                   Back Side
@@ -772,31 +1009,34 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
               </div>
             </div>
 
-            <div className="px-6 py-3.5 border-t border-slate-200 flex items-center justify-between bg-white">
+            <div className="px-5 py-3.5 border-t border-[#E3E7EB] flex flex-wrap items-center justify-between gap-2 bg-white">
               <button
+                type="button"
                 onClick={() => {
                   onSelectStudentForEditor(previewStudent.id);
                   setPreviewStudent(null);
-                  onNavigate && onNavigate('editor');
+                  onNavigate?.('editor');
                 }}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1.5"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#24364B] hover:text-[#304A64]"
               >
                 <Sliders className="w-3.5 h-3.5" />
-                <span>Open in Customizer Studio</span>
+                <span>Edit in ID Card Studio</span>
               </button>
 
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={handleExportPng}
                   disabled={isExporting}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-[#202B38] bg-white border border-[#E3E7EB] hover:bg-[#F0F2F4] rounded-lg disabled:opacity-50"
                 >
                   Download PNG
                 </button>
                 <button
+                  type="button"
                   onClick={handleExportPdf}
                   disabled={isExporting}
-                  className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors shadow-sm"
+                  className="px-3.5 py-1.5 text-xs font-semibold text-white bg-[#24364B] hover:bg-[#304A64] rounded-lg disabled:opacity-50"
                 >
                   Download CR80 PDF
                 </button>
@@ -812,9 +1052,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         onClose={() => setIsZipModalOpen(false)}
         students={students}
         onApplyPhotos={(updatedStudents) => {
-          if (onUpdateStudentsBulk) {
-            onUpdateStudentsBulk(updatedStudents);
-          }
+          onUpdateStudentsBulk?.(updatedStudents);
         }}
       />
     </div>
